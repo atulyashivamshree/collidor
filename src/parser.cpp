@@ -10,21 +10,37 @@
 //#include "fcl_resources/config.h"
 
 
-
 using namespace std;
 using namespace fcl;
 
-template <typename S>
-void test_mesh_distance();
-
-int main()
+template<typename BV>
+std::ostream & operator<<(std::ostream& os, Transform3<typename BV::S> tf)
 {
-    cout << "yetti" << endl;
-    Triangle tri;
-    test_mesh_distance<double>();
+	os << tf.matrix();
 }
 
-bool verbose = false;
+template<typename S>
+std::ostream & operator<<(std::ostream& os, RSS<S> vol)
+{
+	os << "axis : \n" << vol.axis << endl;
+	os << "origin : [" << vol.To(0) << ", " << vol.To(1) << ", " << vol.To(2) << "]" << endl;
+	os << "sides: [" << vol.l[0] << ", " << vol.l[1] << "]" << endl;
+	os << "radius: " << vol.r << endl;
+}
+
+template <typename S>
+void test_mesh_distance(string, string);
+
+int main(int argc, char *argv[])
+{
+    if(argc < 3)
+    	cout << "USAGE : load_files file1 file2" << endl;
+
+    Triangle tri;
+    test_mesh_distance<double>(argv[1], argv[2]);
+}
+
+bool verbose = true;
 
 template <typename S>
 S DELTA() { return 0.001; }
@@ -60,13 +76,13 @@ bool nearlyEqual(const Vector3<S>& a, const Vector3<S>& b)
   return true;
 }
 template <typename S>
-void test_mesh_distance()
+void test_mesh_distance(string file1, string file2)
 {
   std::vector<Vector3<S>> p1, p2;
   std::vector<Triangle> t1, t2;
 
-  test::loadOBJFile("../env.obj", p1, t1);
-  test::loadOBJFile("../rob.obj", p2, t2);
+  test::loadOBJFile(file1.c_str(), p1, t1);
+  test::loadOBJFile(file2.c_str(), p2, t2);
 
   aligned_vector<Transform3<S>> transforms; // t0
   S extents[] = {-3000, -3000, 0, 3000, 3000, 3000};
@@ -76,14 +92,28 @@ void test_mesh_distance()
   std::size_t n = 1;
 #endif
 
-  test::generateRandomTransforms(extents, transforms, n);
+//  test::generateRandomTransforms(extents, transforms, n);
+
+  Vector3<S> position(0.0, 0.0, 100.0);
+  transforms.push_back(Transform3<S>::Identity());
+  transforms[0].linear() = Matrix3<S>::Identity();
+  transforms[0].translation() = position;
 
   double dis_time = 0;
   double col_time = 0;
 
+  cout << "vertices are : " << endl;
+  for(auto v : p1)
+	  cout << v << endl;
+
+  cout << "triangles are : " << endl;
+  for(auto t : t1)
+	  cout << t[0] << " " << t[1]  << " " << t[2] << endl;
+
   test::DistanceRes<S> res, res_now;
   for(std::size_t i = 0; i < transforms.size(); ++i)
   {
+	cout << "transform is " << transforms[i].matrix() << endl;
     test::Timer timer_col;
     timer_col.start();
     collide_Test_OBB(transforms[i], p1, t1, p2, t2, detail::SPLIT_METHOD_MEAN, verbose);
@@ -162,6 +192,16 @@ void distance_Test_Oriented(const Transform3<typename BV::S>& tf,
   m2.beginModel();
   m2.addSubModel(vertices2, triangles2);
   m2.endModel();
+
+  cout << "num BVs in 1" << m1.getNumBVs() << endl;
+  cout << "num BVs in 2" << m2.getNumBVs() << endl;
+  cout << "[model type]" << m1.getNodeType() << endl;
+
+  for(int i = 0; i < m1.getNumBVs(); i++)
+  {
+	  auto obj = m1.getBV(i);
+	  cout << "Extent [" << i << "] : " <<  obj.bv << endl;
+  }
 
   DistanceResult<S> local_result;
   TraversalNode node;
