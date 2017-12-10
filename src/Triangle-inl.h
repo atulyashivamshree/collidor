@@ -1,7 +1,7 @@
 
 #include "LineSeg-inl.h"
 
-float TriDist(float P[3], float Q[3],
+CUDA_PREFIX float TriDist(float P[3], float Q[3],
         const float S[3][3], const float T[3][3], TriDistVars* p_var)  
 {
   // Compute vectors along the 6 sides
@@ -213,7 +213,7 @@ float TriDist(float P[3], float Q[3],
 }
 
 
-float distTriangles(const Triangle* s1, const Triangle *s2, 
+CUDA_PREFIX float distTriangles(const Triangle* s1, const Triangle *s2, 
                         DistTriangleVars* p_var)
 {
 

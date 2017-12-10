@@ -1,31 +1,31 @@
 // #include <cmath>
 
-INLINE_PREFIX void VcV(float Vr[3], const float V[3])
+CUDA_PREFIX INLINE_PREFIX void VcV(float Vr[3], const float V[3])
 {
   Vr[0] = V[0];  Vr[1] = V[1];  Vr[2] = V[2];
 }
 
 
-INLINE_PREFIX void VmV(float Vr[3], const float V1[3], const float V2[3])
+CUDA_PREFIX INLINE_PREFIX void VmV(float Vr[3], const float V1[3], const float V2[3])
 {
   Vr[0] = V1[0] - V2[0];
   Vr[1] = V1[1] - V2[1];
   Vr[2] = V1[2] - V2[2];
 }
 
-INLINE_PREFIX void VcrossV(float Vr[3], const float V1[3], const float V2[3])
+CUDA_PREFIX INLINE_PREFIX void VcrossV(float Vr[3], const float V1[3], const float V2[3])
 {
   Vr[0] = V1[1]*V2[2] - V1[2]*V2[1];
   Vr[1] = V1[2]*V2[0] - V1[0]*V2[2];
   Vr[2] = V1[0]*V2[1] - V1[1]*V2[0];
 }
 
-INLINE_PREFIX float Vlength(float V[3])
+CUDA_PREFIX INLINE_PREFIX float Vlength(float V[3])
 {
   return sqrtf(V[0]*V[0] + V[1]*V[1] + V[2]*V[2]);
 }
 
-INLINE_PREFIX void Vnormalize(float V[3])
+CUDA_PREFIX INLINE_PREFIX void Vnormalize(float V[3])
 {
   float d = (float)1.0 / sqrt(V[0]*V[0] + V[1]*V[1] + V[2]*V[2]);
   V[0] *= d;
@@ -33,33 +33,33 @@ INLINE_PREFIX void Vnormalize(float V[3])
   V[2] *= d;
 }
 
-INLINE_PREFIX float VdotV(const float V1[3], const float V2[3])
+CUDA_PREFIX INLINE_PREFIX float VdotV(const float V1[3], const float V2[3])
 {
   return (V1[0]*V2[0] + V1[1]*V2[1] + V1[2]*V2[2]);
 }
 
-INLINE_PREFIX float VdistV2(const float V1[3], const float V2[3])
+CUDA_PREFIX INLINE_PREFIX float VdistV2(const float V1[3], const float V2[3])
 {
   return ( (V1[0]-V2[0]) * (V1[0]-V2[0]) + 
      (V1[1]-V2[1]) * (V1[1]-V2[1]) + 
      (V1[2]-V2[2]) * (V1[2]-V2[2]));
 }
 
-INLINE_PREFIX void VpV(float Vr[3], const float V1[3], const float V2[3])
+CUDA_PREFIX INLINE_PREFIX void VpV(float Vr[3], const float V1[3], const float V2[3])
 {
   Vr[0] = V1[0] + V2[0];
   Vr[1] = V1[1] + V2[1];
   Vr[2] = V1[2] + V2[2];
 }
 
-INLINE_PREFIX void VpVxS(float Vr[3], const float V1[3], const float V2[3], float s)
+CUDA_PREFIX INLINE_PREFIX void VpVxS(float Vr[3], const float V1[3], const float V2[3], float s)
 {
   Vr[0] = V1[0] + V2[0] * s;
   Vr[1] = V1[1] + V2[1] * s;
   Vr[2] = V1[2] + V2[2] * s;
 }
 
-INLINE_PREFIX void VxS(float Vr[3], const float V[3], float s)
+CUDA_PREFIX INLINE_PREFIX void VxS(float Vr[3], const float V[3], float s)
 {
   Vr[0] = V[0] * s;
   Vr[1] = V[1] * s;
@@ -78,7 +78,7 @@ INLINE_PREFIX void VxS(float Vr[3], const float V[3], float s)
 // In Information Processing Letters, no. 21, pages 55-61, 1985.   
 //--------------------------------------------------------------------------
 
-void SegPoints(float VEC[3], 
+CUDA_PREFIX void SegPoints(float VEC[3], 
     float X[3], float Y[3],             // closest points
           const float P[3], const float A[3], // seg 1 origin, vector
           const float Q[3], const float B[3], // seg 2 origin, vector
@@ -104,7 +104,7 @@ void SegPoints(float VEC[3],
 
   // clamp result so t is on the segment P,A
 
-  if ((p_var->t < 0) || isnanf(p_var->t)) p_var->t = 0; else if (p_var->t > 1) p_var->t = 1;
+  if ((p_var->t < 0) || isnan(p_var->t)) p_var->t = 0; else if (p_var->t > 1) p_var->t = 1;
 
   // find u for poinp_var->t on ray Q,B closest to point at t
 
@@ -114,13 +114,13 @@ void SegPoints(float VEC[3],
   // closest points, otherwise, clamp u, recompute and
   // clamp t 
 
-  if ((p_var->u <= 0) || isnanf(p_var->u)) {
+  if ((p_var->u <= 0) || isnan(p_var->u)) {
 
     VcV(Y, Q);
 
     p_var->t = p_var->A_dot_T / p_var->A_dot_A;
 
-    if ((p_var->t <= 0) || isnanf(p_var->t)) {
+    if ((p_var->t <= 0) || isnan(p_var->t)) {
       VcV(X, P);
       VmV(VEC, Q, P);
     }
@@ -140,7 +140,7 @@ void SegPoints(float VEC[3],
 
     p_var->t = (p_var->A_dot_B + p_var->A_dot_T) / p_var->A_dot_A;
 
-    if ((p_var->t <= 0) || isnanf(p_var->t)) {
+    if ((p_var->t <= 0) || isnan(p_var->t)) {
       VcV(X, P);
       VmV(VEC, Y, P);
     }
@@ -159,7 +159,7 @@ void SegPoints(float VEC[3],
 
     VpVxS(Y, Q, B, p_var->u);
 
-    if ((p_var->t <= 0) || isnanf(p_var->t)) {
+    if ((p_var->t <= 0) || isnan(p_var->t)) {
       VcV(X, P);
       VcrossV(p_var->TMP, p_var->T, B);
       VcrossV(VEC, B, p_var->TMP);

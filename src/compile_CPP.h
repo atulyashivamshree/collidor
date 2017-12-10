@@ -3,5 +3,6 @@
 
 #define CUDA_PREFIX 
 #define INLINE_PREFIX inline
+#define HOST_PREFIX 
 #include <cmath>
 #endif
