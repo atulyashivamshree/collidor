@@ -14,10 +14,13 @@ struct RSS
 	Vector3 To;
 
 	// side length of the rectangle
-	double l[2];
+	float l[2];
 
 	// radius of the sphere
-	double r;
+	float r;
+
+  // volume of the unit
+  float vol;
 };
 
 // stores temporary vals implements the RSS distance computation
@@ -26,18 +29,9 @@ struct RSS_dist
 
 };
 
-// stores temporary vals for triangle distance computation
-struct Triangle_dist
-{
-
-};
-
 CUDA_PREFIX float rectDistance(const RSS* a, const RSS* b, RSS_dist* d);
 
 CUDA_PREFIX float rssDistance(const RSS* a, const RSS* b, RSS_dist* d);
-
-CUDA_PREFIX float triangleDistance(const Triangle* a, const Triangle* b,
-                                                      Triangle_dist* d);
 
 #include "RSS-inl.h"
 

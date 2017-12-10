@@ -3,5 +3,5 @@
 
 #define CUDA_PREFIX 
 #define INLINE_PREFIX inline
-
+#include <cmath>
 #endif
