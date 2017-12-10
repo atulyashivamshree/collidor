@@ -24,14 +24,13 @@ struct RSS
 };
 
 // stores temporary vals implements the RSS distance computation
-struct RSS_dist
+struct DistRSSVars
 {
-
+	DistTriangleVars dist_triangle_vars;
 };
 
-CUDA_PREFIX float rectDistance(const RSS* a, const RSS* b, RSS_dist* d);
-
-CUDA_PREFIX float rssDistance(const RSS* a, const RSS* b, RSS_dist* d);
+CUDA_PREFIX float rssDistance(const Matrix3* R, const Vector3* t,
+						const RSS* a, const RSS* b, DistRSSVars* d);
 
 #include "RSS-inl.h"
 

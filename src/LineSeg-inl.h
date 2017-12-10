@@ -1,5 +1,10 @@
 // #include <cmath>
 
+CUDA_PREFIX INLINE_PREFIX void initV(float V[3])
+{
+  V[0] = 0; V[1] = 0; V[2] = 0;
+}
+
 CUDA_PREFIX INLINE_PREFIX void VcV(float Vr[3], const float V[3])
 {
   Vr[0] = V[0];  Vr[1] = V[1];  Vr[2] = V[2];
@@ -66,6 +71,12 @@ CUDA_PREFIX INLINE_PREFIX void VxS(float Vr[3], const float V[3], float s)
   Vr[2] = V[2] * s;
 }
 
+CUDA_PREFIX INLINE_PREFIX void MxV(float Vr[3], const float M[3][3], const float V[3])
+{
+  Vr[0] = M[0][0] * V[0] + M[0][1] * V[1] + M[0][2] * V[2];
+  Vr[1] = M[1][0] * V[0] + M[1][1] * V[1] + M[1][2] * V[2];
+  Vr[2] = M[2][0] * V[0] + M[2][1] * V[1] + M[2][2] * V[2];
+}
 
 //--------------------------------------------------------------------------
 // SegPoints() 
