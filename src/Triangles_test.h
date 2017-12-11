@@ -18,9 +18,9 @@ using std::endl;
 
 const float SPACE_LOW = -1.0;
 const float SPACE_HIGH = 1.0;
-const int NUM_CHECK = 100000;
+const int NUM_CHECK = 1000000;
 const int STRESS_CHECK = 10000;
-const float EPSILON = 5e-7;
+const float EPSILON = 5e-5;
 
 HOST_PREFIX std::ostream& operator<<(std::ostream& os, Triangle tri);
 
@@ -161,7 +161,7 @@ HOST_PREFIX void test_stress_random()
     assert(false);
   }
 
-  cout << "TEST Triangles Stress random : PASSED" << endl;
+  cout << "TEST Triangles Stress random " << endl;
 }
 
 HOST_PREFIX std::ostream& operator<<(std::ostream& os, Triangle tri)

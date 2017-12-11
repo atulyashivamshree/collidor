@@ -183,7 +183,7 @@ void testMultipleSerial()
   cudaMemcpy(d_s2, &h_s2, size_tri, cudaMemcpyHostToDevice);
 
   for(int i = 0; i < NUM_CHECK; i++)
-    computeDistance<<<1, 32>>>(d_s1, d_s2, d_res);
+    computeDistance<<<1, 1>>>(d_s1, d_s2, d_res);
 
   cudaDeviceSynchronize();
   double t_cuda_end = get_wall_time();
