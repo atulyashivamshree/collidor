@@ -78,27 +78,24 @@ CUDA_PREFIX INLINE_PREFIX void initTriangle(Triangle* tri,
 CUDA_PREFIX float rssDistance(const Matrix3* R, const Vector3* t,
 						const RSS* a, const RSS* b, DistRSSVars* p_var)
 {
-  float vert_a[4][3];
-  float vert_b[4][3];
+  
 
-  transformPoints(R, t, a, vert_a);
-  getPoints(b, vert_b);
+  transformPoints(R, t, a, p_var->vert_a);
+  getPoints(b, p_var->vert_b);
 
-  float d[4];
-  Triangle a1, a2, b1, b2;
-  initTriangle(&a1, vert_a[0], vert_a[1], vert_a[3]);
-  initTriangle(&a2, vert_a[0], vert_a[2], vert_a[3]);
-  initTriangle(&b1, vert_b[0], vert_b[1], vert_b[3]);
-  initTriangle(&b2, vert_b[0], vert_b[2], vert_b[3]);
+  initTriangle(&p_var->a1, p_var->vert_a[0], p_var->vert_a[1], p_var->vert_a[3]);
+  initTriangle(&p_var->a2, p_var->vert_a[0], p_var->vert_a[2], p_var->vert_a[3]);
+  initTriangle(&p_var->b1, p_var->vert_b[0], p_var->vert_b[1], p_var->vert_b[3]);
+  initTriangle(&p_var->b2, p_var->vert_b[0], p_var->vert_b[2], p_var->vert_b[3]);
 
-  d[0] = distTriangles(&a1, &b1, &p_var->dist_triangle_vars);
-  d[1] = distTriangles(&a1, &b2, &p_var->dist_triangle_vars);
-  d[2] = distTriangles(&a2, &b1, &p_var->dist_triangle_vars);
-  d[3] = distTriangles(&a2, &b2, &p_var->dist_triangle_vars);
+  p_var->d[0] = distTriangles(&p_var->a1, &p_var->b1, &p_var->dist_triangle_vars);
+  p_var->d[1] = distTriangles(&p_var->a1, &p_var->b2, &p_var->dist_triangle_vars);
+  p_var->d[2] = distTriangles(&p_var->a2, &p_var->b1, &p_var->dist_triangle_vars);
+  p_var->d[3] = distTriangles(&p_var->a2, &p_var->b2, &p_var->dist_triangle_vars);
 
-  float min_d = fminf(d[0], d[1]);
-  min_d = fminf(min_d, d[2]);
-  min_d = fminf(min_d, d[3]);
+  float min_d = fminf(p_var->d[0], p_var->d[1]);
+  min_d = fminf(min_d, p_var->d[2]);
+  min_d = fminf(min_d, p_var->d[3]);
   min_d = min_d - (a->r + b->r);
   min_d = fmaxf(min_d, 0);
 

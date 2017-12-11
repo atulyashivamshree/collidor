@@ -26,6 +26,13 @@ struct RSS
 // stores temporary vals implements the RSS distance computation
 struct DistRSSVars
 {
+	float vert_a[4][3];
+  float vert_b[4][3];
+
+  float d[4];
+
+  Triangle a1, a2, b1, b2;
+
 	DistTriangleVars dist_triangle_vars;
 };
 
