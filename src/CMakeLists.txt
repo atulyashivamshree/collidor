@@ -19,6 +19,9 @@ target_link_libraries(test_fcl_utility_local fcl)
 add_executable(load_files parser.cpp)
 target_link_libraries(load_files fcl test_fcl_utility_local ccd "${OCTOMAP_LIBS}")
 
+add_executable(save_to_bvh utils/fcl_cdp_conversion.cpp)
+target_link_libraries(save_to_bvh fcl test_fcl_utility_local ccd "${OCTOMAP_LIBS}")
+
 add_executable(test_vector test_vector_math.cpp)
 add_executable(test_rss test_rss.cpp)
 
