@@ -18,10 +18,7 @@
 
 using namespace std;
 
-void createSampleObj1(vector<fcl::Vector3<float>>& vertices,
-        vector<fcl::Triangle>& triangles);
-void createSampleObj2(vector<fcl::Vector3<float>>& vertices,
-        vector<fcl::Triangle>& triangles);
+#include "SampleObjects.h"
 
 // takes in a BVH of FCL and converts to BVH of this project
 void convertFCLToBVH(const fcl::BVHModel<fcl::RSS<float>>& bvh_fcl,
@@ -37,7 +34,7 @@ int main(int argc, char *argv[])
   std::vector<fcl::Triangle> triangles;
 
   if(argc < 2)
-    createSampleObj2(points, triangles);
+    createSampleObj1(points, triangles);
   else
     fcl::test::loadOBJFile(argv[1], points, triangles);
 
@@ -215,30 +212,4 @@ void testCONV(const BVH *bvh)
 
   for(int j = 0; j < bvh->num_tri; j++)
     assert(read_bvh.tri_arr[j] == bvh->tri_arr[j]);
-}
-
-void createSampleObj1(vector<fcl::Vector3<float>>& vertices,
-        vector<fcl::Triangle>& triangles)
-{
-  vertices.push_back(fcl::Vector3<float>(0, 0, 0));
-  vertices.push_back(fcl::Vector3<float>(0, 3, 0));
-  vertices.push_back(fcl::Vector3<float>(3, 2, 0));
-  vertices.push_back(fcl::Vector3<float>(5, 4, 0));
-  vertices.push_back(fcl::Vector3<float>(7, 1, 0));
-
-  triangles.push_back(fcl::Triangle(0, 1, 2));
-  triangles.push_back(fcl::Triangle(3, 1, 2));
-  triangles.push_back(fcl::Triangle(3, 4, 2));
-}
-
-void createSampleObj2(vector<fcl::Vector3<float>>& vertices,
-        vector<fcl::Triangle>& triangles)
-{
-  vertices.push_back(fcl::Vector3<float>(8, 2, 0));
-  vertices.push_back(fcl::Vector3<float>(10, 5, 0));
-  vertices.push_back(fcl::Vector3<float>(12, 2, 0));
-  vertices.push_back(fcl::Vector3<float>(11, 0, 0));
-
-  triangles.push_back(fcl::Triangle(0, 1, 2));
-  triangles.push_back(fcl::Triangle(0, 3, 2));
 }
