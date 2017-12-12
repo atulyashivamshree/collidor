@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
   std::vector<fcl::Triangle> triangles;
 
   if(argc < 2)
-    createSampleObj1(points, triangles);
+    createSampleObj2(points, triangles);
   else
     fcl::test::loadOBJFile(argv[1], points, triangles);
 
@@ -85,9 +85,7 @@ RSS getRSSCDP(const fcl::RSSf& rss)
 
 	obj.r = rss.r;
 
-	obj.vol = rss.volume();
-	if(rss.volume() == 0)
-		obj.vol = rss.l[0]*rss.l[1];
+	obj.size = rss.size();
 
 	return obj;
 }
@@ -169,7 +167,7 @@ bool operator!=(const RSS& lhs, const RSS& rhs)
 
   if(!approx_Equals(lhs.r, rhs.r))
     return true;
-  if(!approx_Equals(lhs.vol, rhs.vol, 1e-4))
+  if(!approx_Equals(lhs.size, rhs.size, 1e-4))
     return true;
 
   return false;

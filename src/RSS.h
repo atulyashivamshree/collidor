@@ -20,7 +20,7 @@ struct RSS
 	float r;
 
   // volume of the unit
-  float vol;
+  float size;
 };
 
 // stores temporary vals implements the RSS distance computation

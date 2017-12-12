@@ -77,7 +77,7 @@ std::ostream& operator<<(std::ostream& os, const RSS& rss)
 	os << rss.l[1] << " ";
 	os << rss.r << " ";
 
-	os << rss.vol;
+	os << rss.size;
 
 	return os;
 }
@@ -123,7 +123,7 @@ std::istream& operator>>(std::istream& is, RSS& rss)
 	is >> rss.l[1];
 	is >> rss.r;
 
-	is >> rss.vol;
+	is >> rss.size;
 
 	return is;
 }
