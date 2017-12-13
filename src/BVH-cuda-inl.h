@@ -32,6 +32,7 @@ struct Config
   int dbg_size;
   Matrix3 R;
   Vector3 t;
+  int enable_distance_reduction;  // set it to 0 to print get distance on all possible leaf elements without early termination
 };
 struct DebugVar
 {
@@ -205,7 +206,7 @@ __global__ void processBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* c
     RSSResult res;
     computeDistance(&cfg->R, &cfg->t, &bvA.rss, &bvB.rss, &res);
 
-    bv_q->arr[arr_id].dist = res.dist;
+    bv_q->arr[arr_id].dist = res.id;
   }
 }
 
@@ -218,8 +219,8 @@ __global__ void processLeafTasks(const BVH* bvhA, const BVH* bvhB, const Config*
   {
     int arr_id = getIdFromQueue(leaf_q, j);
     Task t = leaf_q->arr[arr_id];
-    Triangle tA = bvhA->tri_arr[t.i1];
-    Triangle tB = bvhB->tri_arr[t.i2];
+    Triangle tA = bvhA->tri_arr[bvhA->bv_arr[t.i1].idt];
+    Triangle tB = bvhB->tri_arr[bvhB->bv_arr[t.i2].idt];
 
     TriangleResult res;
     computeDistance(&cfg->R, &cfg->t, &tA, &tB, &res);
@@ -228,7 +229,7 @@ __global__ void processLeafTasks(const BVH* bvhA, const BVH* bvhB, const Config*
   }
 }
 
-__global__ void manager(const BVH* bvh1, const BVH* bvh2, const Config* cfg,
+__global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
                       Queue *bv_queue, Queue *l_queue,
                       DebugVar* dbg_var, DistanceResult *result)
 {
@@ -260,7 +261,7 @@ __global__ void manager(const BVH* bvh1, const BVH* bvh2, const Config* cfg,
     dimGridBV.y = (num_bv_tasks - 1)/BLOCKSIZE_BV + 1;
     if(num_bv_tasks)
     {
-      processBVTasks<<<dimGridBV, dimBlockBV>>>(bvh1, bvh2, cfg, bv_queue, num_bv_tasks);
+      processBVTasks<<<dimGridBV, dimBlockBV>>>(bvhA, bvhB, cfg, bv_queue, num_bv_tasks);
     }
     cudaDeviceSynchronize();
 
@@ -270,17 +271,20 @@ __global__ void manager(const BVH* bvh1, const BVH* bvh2, const Config* cfg,
 
     if(num_leaf_tasks)
     {
-      processLeafTasks<<<dimGridLeaf, dimBlockLeaf>>>(bvh1, bvh2, cfg, l_queue, 
+      processLeafTasks<<<dimGridLeaf, dimBlockLeaf>>>(bvhA, bvhB, cfg, l_queue, 
                                         num_leaf_tasks);
     }
     cudaDeviceSynchronize();
 
     // REDUCE THE LEAF TREE DATA
-    // reduceLeafTasks(bvh1, bvh2, cfg, l_queue, result, num_leaf_tasks);
-    cudaDeviceSynchronize();
+    if(cfg->enable_distance_reduction)
+    {
+      reduceLeafTasks(bvhA, bvhB, cfg, l_queue, result, num_leaf_tasks);
+      cudaDeviceSynchronize();
+    }
 
     // ADD MORE TASKS FROM BV TREE
-    addBVTasks(bvh1, bvh2, cfg, bv_queue, l_queue, result, num_bv_tasks);
+    addBVTasks(bvhA, bvhB, cfg, bv_queue, l_queue, result, num_bv_tasks);
     cudaDeviceSynchronize();
 
     res = *result;
@@ -294,12 +298,19 @@ __global__ void manager(const BVH* bvh1, const BVH* bvh2, const Config* cfg,
 
   }
 
+  BV bvA = bvhA->bv_arr[2];
+  BV bvB = bvhB->bv_arr[0];
+
+  RSSResult rss_res;
+  computeDistance(&cfg->R, &cfg->t, &bvA.rss, &bvB.rss, &rss_res);
+
   for(int i = 0; i < 10; i++)
     dbg_var[i].tsk = bv_queue->arr[i];
   for(int i = 0; i < 5; i++)
     dbg_var[i + 10].tsk = l_queue->arr[i];
 
   *result = res;
+  result->tsk.dist = rss_res.dist;
   result->idx = bv_queue->size;
   result->idy = l_queue->size;
   // result->dist = bv_queue->arr[0].i1;
@@ -423,6 +434,7 @@ __host__ DistanceResult computeDistance(const BVH* bvh1, const BVH* bvh2, Config
 
   // print out all the queue info that was gathered
   std::ofstream of;
+  of << std::setprecision(7);
   of.open("output_queue.csv");
   of << "NUM_BV: " << h_bvq.last << " NUM_LEAF: " << h_leafq.last << endl;
   for(int i = 0;i < h_bvq.last; i++)

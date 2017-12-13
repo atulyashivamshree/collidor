@@ -31,6 +31,7 @@ struct DistRSSVars
 
 struct RSSResult
 {
+  float id;
   float dist;
 };
 

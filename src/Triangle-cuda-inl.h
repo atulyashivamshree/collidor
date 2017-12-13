@@ -23,7 +23,7 @@ __device__ void computeDistance(const Matrix3* R, const Vector3* t,
   res->dist = dist;
 }
 
-__global__ void computeDistance(const Triangle *s1, const Triangle* s2, TriangleResult* res)
+__global__ void computeDistanceSingle(const Triangle *s1, const Triangle* s2, TriangleResult* res)
 {
   __shared__ Triangle loc_s1;
   __shared__ Triangle loc_s2;

@@ -13,11 +13,11 @@ const int BLOCKSIZE_RECT = 32;
 __device__ void computeDistance(const Matrix3* R, const Vector3* t,
                     const RSS *r1, const RSS* d2, RSSResult* res)
 {
-  __shared__ Matrix3 loc_R;
-  __shared__ Vector3 loc_t;
-  __shared__ RSS loc_r1;
-  __shared__ RSS loc_d2;
-  __shared__ DistRSSVars vars;
+  Matrix3 loc_R;
+  Vector3 loc_t;
+  RSS loc_r1;
+  RSS loc_d2;
+  DistRSSVars vars;
 
   loc_R = *R;
   loc_t = *t;
@@ -26,7 +26,27 @@ __device__ void computeDistance(const Matrix3* R, const Vector3* t,
   loc_d2 = *d2;
   // res->dist = 1e-6 + distRSSs(r1, d2, &vars);
   float dist = rssDistance(&loc_R, &loc_t, &loc_r1, &loc_d2, &vars);
-  res->dist = dist;
+  res->id = dist;
+
+}
+
+__device__ void computeDistanceSingle(const Matrix3* R, const Vector3* t,
+                    const RSS *r1, const RSS* d2, RSSResult* res)
+{
+  Matrix3 loc_R;
+  Vector3 loc_t;
+  RSS loc_r1;
+  RSS loc_d2;
+  DistRSSVars vars;
+
+  loc_R = *R;
+  loc_t = *t;
+
+  loc_r1 = *r1;
+  loc_d2 = *d2;
+  // res->dist = 1e-6 + distRSSs(r1, d2, &vars);
+  float dist = rssDistance(&loc_R, &loc_t, &loc_r1, &loc_d2, &vars);
+  res->id = dist;
 
 }
 
