@@ -25,6 +25,9 @@ target_link_libraries(save_to_bvh fcl test_fcl_utility_local ccd "${OCTOMAP_LIBS
 add_executable(compute_dist_bvh utils/compute_FCL_distance.cpp)
 target_link_libraries(compute_dist_bvh fcl test_fcl_utility_local ccd "${OCTOMAP_LIBS}")
 
+add_executable(verify_dist utils/distance_verification.cpp)
+target_link_libraries(verify_dist fcl test_fcl_utility_local ccd "${OCTOMAP_LIBS}")
+
 add_executable(test_vector test_vector_math.cpp)
 add_executable(test_rss test_rss.cpp)
 
