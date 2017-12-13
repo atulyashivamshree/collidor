@@ -14,6 +14,7 @@
 using Eigen::Vector3f;
 
 // TODO(@atulya) rename Matrix3 to Mat3 to avoid confusion with EIgen
+float t2_[3] = {0, 0, 1.5};
 const Matrix3 MAT_I = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
 const Vector3 t0({0, 0, 0});
 Matrix3 MAT_RXY45;
@@ -89,13 +90,18 @@ fcl::RSS<float> getFCLRSS(RSS shp) {
   return obj;
 }
 
-HOST_PREFIX float distRectangles_fcl(RSS s1, RSS s2)
+HOST_PREFIX float distRectangles_fcl(const float R[3][3], const float t[3], RSS s1, RSS s2)
 {
   fcl::RSS<float> fcl_s1, fcl_s2;
   fcl_s1 = getFCLRSS(s1);
   fcl_s2 = getFCLRSS(s2);
   Vector3f p, q;
-  return fcl_s1.distance(fcl_s2, &p, &q);
+  fcl::Transform3f tf;
+  tf(0,0) = R[0][0]; tf(0,1) = R[0][1]; tf(0,2) = R[0][2]; tf(0,3) = t[0];
+  tf(1,0) = R[1][0]; tf(1,1) = R[1][1]; tf(1,2) = R[1][2]; tf(1,3) = t[1];
+  tf(2,0) = R[2][0]; tf(2,1) = R[2][1]; tf(2,2) = R[2][2]; tf(2,3) = t[2];
+  
+  return distance(tf.linear(), tf.translation(),fcl_s1 , fcl_s2, &p, &q);
 }
 
 void print_Rectangle_stats()
@@ -123,18 +129,18 @@ void test_rectangles_2D()
   q1.l[1] = 3;
   q1.r = 0.0;
 
-  assert(approx_equal(distRectangles_fcl(p1, q1), 1.5));
-  std::cout << "RSS distance outside " <<  DIST_RSS(&MAT_I, &t0, &p1, &q1, &preset_var) << std::endl;
-  assert(approx_equal(DIST_RSS(&MAT_I, &t0, &p1, &q1, &preset_var), 1.5));
+  assert(approx_equal(distRectangles_fcl(matI_, t0_, p1, q1), 1.5));
+  std::cout << "RSS distance outside " <<  DIST_RSS(matI_, t0_, &p1, &q1, &preset_var) << std::endl;
+  assert(approx_equal(DIST_RSS(matI_, t0_, &p1, &q1, &preset_var), 1.5));
 
   q2.axis = MAT_RXY45;
   q2.To = Vector3({5, 1, 0});
   q2.l[0] = 5;
   q2.l[1] = 3;
   q2.r = 0.0;  
-  assert(approx_equal(distRectangles_fcl(p1, q2), 0));
-  std::cout << "Rectangle distance on " <<  DIST_RSS(&MAT_I, &t0, &p1, &q2, &preset_var) << std::endl;
-  assert(approx_equal(DIST_RSS(&MAT_I, &t0, &p1, &q2, &preset_var), 0));
+  assert(approx_equal(distRectangles_fcl(matI_, t0_, p1, q2), 0));
+  std::cout << "Rectangle distance on " <<  DIST_RSS(matI_, t0_, &p1, &q2, &preset_var) << std::endl;
+  assert(approx_equal(DIST_RSS(matI_, t0_, &p1, &q2, &preset_var), 0));
 
   // first intersection
   q3.axis = MAT_RXY45;
@@ -142,9 +148,20 @@ void test_rectangles_2D()
   q3.l[0] = 5;
   q3.l[1] = 3;
   q3.r = 0.0;  
-  std::cout << "Rectangle distance inside " <<  DIST_RSS(&MAT_I, &t0, &p1, &q3, &preset_var) << std::endl;
-  assert(approx_equal(distRectangles_fcl(p1, q3), 0));
-  assert(approx_equal(DIST_RSS(&MAT_I, &t0, &p1, &q3, &preset_var), 0));
+  std::cout << "Rectangle distance inside " <<  DIST_RSS(matI_, t0_, &p1, &q3, &preset_var) << std::endl;
+  assert(approx_equal(distRectangles_fcl(matI_, t0_, p1, q3), 0));
+  assert(approx_equal(DIST_RSS(matI_, t0_, &p1, &q3, &preset_var), 0));
+
+
+  std::cout << "Rectangle distance inside " <<  DIST_RSS(matI_, t1_, &p1, &q1, &preset_var) << std::endl;
+  std::cout << "Rectangle distance inside true" <<  distRectangles_fcl(matI_, t1_, p1, q1) << std::endl;
+  assert(approx_equal(distRectangles_fcl(matI_, t1_, p1, q1), 2.5));
+  assert(approx_equal(DIST_RSS(matI_, t1_, &p1, &q1, &preset_var), 2.5));
+
+  std::cout << "Rectangle distance inside " <<  DIST_RSS(matI_, t2_, &p1, &q1, &preset_var) << std::endl;
+    std::cout << "Rectangle distance inside true" <<  distRectangles_fcl(matI_, t2_, p1, q1) << std::endl;
+    assert(approx_equal(distRectangles_fcl(matI_, t2_, p1, q1), 1.5*sqrt(2)));
+    assert(approx_equal(DIST_RSS(matI_, t2_, &p1, &q1, &preset_var), 1.5*sqrt(2)));
 
   std::cout << "Test Rectangles 2D: PASSED" << std::endl;
 
@@ -169,18 +186,18 @@ void test_rectangles_3D()
   q1.l[1] = 3;
   q1.r = 0.0;
 
-  assert(approx_equal(distRectangles_fcl(p1, q1), 1.23));
-  std::cout << "Rectangle distance outside " <<  DIST_RSS(&MAT_I, &t0, &p1, &q1, &preset_var) << std::endl;
-  assert(approx_equal(DIST_RSS(&MAT_I, &t0, &p1, &q1, &preset_var), 1.23));
+  assert(approx_equal(distRectangles_fcl(matI_, t0_, p1, q1), 1.23));
+  std::cout << "Rectangle distance outside " <<  DIST_RSS(matI_, t0_, &p1, &q1, &preset_var) << std::endl;
+  assert(approx_equal(DIST_RSS(matI_, t0_, &p1, &q1, &preset_var), 1.23));
 
   q2.axis = MAT_RXZ45;
   q2.To = Vector3({2.5, 1, 0});
   q2.l[0] = 5;
   q2.l[1] = 3;
   q2.r = 0.0;
-  assert(approx_equal(distRectangles_fcl(p1, q2), 0));
-  std::cout << "Rectangle distance on " <<  DIST_RSS(&MAT_I, &t0, &p1, &q2, &preset_var) << std::endl;
-  assert(approx_equal(DIST_RSS(&MAT_I, &t0, &p1, &q2, &preset_var), 0));
+  assert(approx_equal(distRectangles_fcl(matI_, t0_, p1, q2), 0));
+  std::cout << "Rectangle distance on " <<  DIST_RSS(matI_, t0_, &p1, &q2, &preset_var) << std::endl;
+  assert(approx_equal(DIST_RSS(matI_, t0_, &p1, &q2, &preset_var), 0));
 
   // first intersection
   q3.axis = MAT_RXZ45;
@@ -189,9 +206,9 @@ void test_rectangles_3D()
   q3.l[1] = 3;
   q3.r = 0.0;
 
-  assert(approx_equal(distRectangles_fcl(p1, q3), 0));
-  std::cout << "Rectangle distance intersection " <<  DIST_RSS(&MAT_I, &t0, &p1, &q3, &preset_var) << std::endl;
-  assert(approx_equal(DIST_RSS(&MAT_I, &t0, &p1, &q3, &preset_var), 0));
+  assert(approx_equal(distRectangles_fcl(matI_, t0_, p1, q3), 0));
+  std::cout << "Rectangle distance intersection " <<  DIST_RSS(matI_, t0_, &p1, &q3, &preset_var) << std::endl;
+  assert(approx_equal(DIST_RSS(matI_, t0_, &p1, &q3, &preset_var), 0));
 
   std::cout << "Test Rectangles 3D : PASSED" << std::endl;
 }
@@ -215,20 +232,20 @@ void test_RSS_2D()
   q1.l[1] = 3;
   q1.r = 0.5;
 
-  std::cout << "RSS distance outside " <<  distRectangles_fcl(p1, q1) << std::endl;
-  assert(approx_equal(distRectangles_fcl(p1, q1), 0.5));
-  std::cout << "RSS distance outisede " <<  DIST_RSS(&MAT_I, &t0, &p1, &q1, &preset_var) << std::endl;
-  assert(approx_equal(DIST_RSS(&MAT_I, &t0, &p1, &q1, &preset_var), 0.5));
+  std::cout << "RSS distance outside " <<  distRectangles_fcl(matI_, t0_, p1, q1) << std::endl;
+  assert(approx_equal(distRectangles_fcl(matI_, t0_, p1, q1), 0.5));
+  std::cout << "RSS distance outisede " <<  DIST_RSS(matI_, t0_, &p1, &q1, &preset_var) << std::endl;
+  assert(approx_equal(DIST_RSS(matI_, t0_, &p1, &q1, &preset_var), 0.5));
 
   q2.axis = MAT_RXY45;
   q2.To = Vector3({6, 1, 0});
   q2.l[0] = 5;
   q2.l[1] = 3;
   q2.r = 0.5;  
-  std::cout << "RSS distance on " <<  distRectangles_fcl(p1, q2) << std::endl;
-  assert(approx_equal(distRectangles_fcl(p1, q2), 0));
-  std::cout << "RSS distance on " <<  DIST_RSS(&MAT_I, &t0, &p1, &q2, &preset_var) << std::endl;
-  assert(approx_equal(DIST_RSS(&MAT_I, &t0, &p1, &q2, &preset_var), 0));
+  std::cout << "RSS distance on " <<  distRectangles_fcl(matI_, t0_, p1, q2) << std::endl;
+  assert(approx_equal(distRectangles_fcl(matI_, t0_, p1, q2), 0));
+  std::cout << "RSS distance on " <<  DIST_RSS(matI_, t0_, &p1, &q2, &preset_var) << std::endl;
+  assert(approx_equal(DIST_RSS(matI_, t0_, &p1, &q2, &preset_var), 0));
 
   // first intersection
   q3.axis = MAT_RXY45;
@@ -236,10 +253,10 @@ void test_RSS_2D()
   q3.l[0] = 5;
   q3.l[1] = 3;
   q3.r = 0.5;  
-  std::cout << "RSS distance intersection " <<  distRectangles_fcl(p1, q3) << std::endl;
-  assert(approx_equal(distRectangles_fcl(p1, q3), 0));
-  std::cout << "RSS distance intersection " <<  DIST_RSS(&MAT_I, &t0, &p1, &q3, &preset_var) << std::endl;
-  assert(approx_equal(DIST_RSS(&MAT_I, &t0, &p1, &q3, &preset_var), 0));
+  std::cout << "RSS distance intersection " <<  distRectangles_fcl(matI_, t0_, p1, q3) << std::endl;
+  assert(approx_equal(distRectangles_fcl(matI_, t0_, p1, q3), 0));
+  std::cout << "RSS distance intersection " <<  DIST_RSS(matI_, t0_, &p1, &q3, &preset_var) << std::endl;
+  assert(approx_equal(DIST_RSS(matI_, t0_, &p1, &q3, &preset_var), 0));
 
   std::cout << "Test RSS 2D: PASSED" << std::endl;
 
@@ -264,18 +281,18 @@ void test_RSS_3D()
   q1.l[1] = 3;
   q1.r = 0.5;
 
-  assert(approx_equal(distRectangles_fcl(p1, q1), 0.23));
-  std::cout << "RSS distance outside " <<  DIST_RSS(&MAT_I, &t0, &p1, &q1, &preset_var) << std::endl;
-  assert(approx_equal(DIST_RSS(&MAT_I, &t0, &p1, &q1, &preset_var), 0.23));
+  assert(approx_equal(distRectangles_fcl(matI_, t0_, p1, q1), 0.23));
+  std::cout << "RSS distance outside " <<  DIST_RSS(matI_, t0_, &p1, &q1, &preset_var) << std::endl;
+  assert(approx_equal(DIST_RSS(matI_, t0_, &p1, &q1, &preset_var), 0.23));
 
   q2.axis = MAT_RXZ45;
   q2.To = Vector3({2.5, 1, 1});
   q2.l[0] = 5;
   q2.l[1] = 3;
   q2.r = 0.5;
-  assert(approx_equal(distRectangles_fcl(p1, q2), 0));
-  std::cout << "RSS distance on " <<  DIST_RSS(&MAT_I, &t0, &p1, &q2, &preset_var) << std::endl;
-  assert(approx_equal(DIST_RSS(&MAT_I, &t0, &p1, &q2, &preset_var), 0));
+  assert(approx_equal(distRectangles_fcl(matI_, t0_, p1, q2), 0));
+  std::cout << "RSS distance on " <<  DIST_RSS(matI_, t0_, &p1, &q2, &preset_var) << std::endl;
+  assert(approx_equal(DIST_RSS(matI_, t0_, &p1, &q2, &preset_var), 0));
 
   // first intersection
   q3.axis = MAT_RXZ45;
@@ -283,9 +300,9 @@ void test_RSS_3D()
   q3.l[0] = 5;
   q3.l[1] = 3;
   q3.r = 0.5;
-  assert(approx_equal(distRectangles_fcl(p1, q3), 0));
-  std::cout << "RSS distance intersection " <<  DIST_RSS(&MAT_I, &t0, &p1, &q3, &preset_var) << std::endl;
-  assert(approx_equal(DIST_RSS(&MAT_I, &t0, &p1, &q3, &preset_var), 0));
+  assert(approx_equal(distRectangles_fcl(matI_, t0_, p1, q3), 0));
+  std::cout << "RSS distance intersection " <<  DIST_RSS(matI_, t0_, &p1, &q3, &preset_var) << std::endl;
+  assert(approx_equal(DIST_RSS(matI_, t0_, &p1, &q3, &preset_var), 0));
 
   std::cout << "Test RSS 3D : PASSED" << std::endl;
 }
@@ -304,8 +321,27 @@ void test_stress_random_RSS()
     RSS r1 = getRandomRSS();
     RSS r2 = getRandomRSS();
 
-   float correct = distRectangles_fcl(r1, r2);
-   float actual = DIST_RSS(&MAT_I, &t0, &r1, &r2, &preset_var);
+    Eigen::Vector3f angles = Eigen::Vector3f::Random();
+    Eigen::Vector3f pos = Eigen::Vector3f::Random();
+
+    Eigen::AngleAxisf rollAngle(angles(0), Eigen::Vector3f::UnitZ());
+    Eigen::AngleAxisf yawAngle(angles(1), Eigen::Vector3f::UnitY());
+    Eigen::AngleAxisf pitchAngle(angles(2), Eigen::Vector3f::UnitX());
+    Eigen::Quaternion<float> q = rollAngle * yawAngle * pitchAngle;
+    Eigen::Matrix3f R = q.matrix();
+
+    float matR[3][3], translation[3];
+    matR[0][0] = R(0,0); matR[0][1] = R(0,1); matR[0][2] = R(0,2);
+    matR[1][0] = R(1,0); matR[1][1] = R(1,1); matR[1][2] = R(1,2);
+    matR[2][0] = R(2,0); matR[2][1] = R(2,1); matR[2][2] = R(2,2);
+
+    translation[0] = pos(0);
+    translation[1] = pos(1);
+    translation[2] = pos(2);
+
+   float correct = distRectangles_fcl(matR, translation, r1, r2);
+//   matR[0][0] = 1;
+   float actual = DIST_RSS(matR, translation, &r1, &r2, &preset_var);
 
    if(!approx_equal(actual, correct))
    {

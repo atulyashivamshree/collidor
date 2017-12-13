@@ -1,35 +1,23 @@
-CUDA_PREFIX void transformPoints(const Matrix3* R, const Vector3* t, 
+CUDA_PREFIX void transformPoints(const float R[3][3], const float t[3], 
                                       const RSS *a, float rot_v[4][3])
 {
-  float matR[3][3];
-  matR[0][0] = R->v1.x;
-  matR[1][0] = R->v1.y;
-  matR[2][0] = R->v1.z;
-  matR[0][1] = R->v2.x;
-  matR[1][1] = R->v2.y;
-  matR[2][1] = R->v2.z;
-  matR[0][2] = R->v3.x;
-  matR[1][2] = R->v3.y;
-  matR[2][2] = R->v3.z;
-  float vecT[3] = {t->x, t->y, t->z};
-
   float n1[3] = {a->axis.v1.x, a->axis.v1.y, a->axis.v1.z};
   float n2[3] = {a->axis.v2.x, a->axis.v2.y, a->axis.v2.z};
   float l[2] = {a->l[0], a->l[1]};
   float v0[3] = {a->To.x, a->To.y, a->To.z};
 
   // rot v0  = R*v0 + t;
-  MxV(rot_v[0], matR, v0);
-  VpV(rot_v[0], rot_v[0], vecT);
+  MxV(rot_v[0], R, v0);
+  VpV(rot_v[0], rot_v[0], t);
 
   // v1 = v0 + l1*n1;
   // rot_v[1] = R*v1 + t = R*v0 + l1*R*n1 + t = rot_v[0] + l1*R*n1
-  MxV(rot_v[1], matR, n1);
+  MxV(rot_v[1], R, n1);
   VxS(rot_v[1], rot_v[1], l[0]);
   VpV(rot_v[1], rot_v[1], rot_v[0]);
 
   // same for v2
-  MxV(rot_v[2], matR, n2);
+  MxV(rot_v[2], R, n2);
   VxS(rot_v[2], rot_v[2], l[1]);
   VpV(rot_v[2], rot_v[2], rot_v[0]);
 
@@ -75,14 +63,14 @@ CUDA_PREFIX INLINE_PREFIX void initTriangle(Triangle* tri,
   tri->c.z = v2[2];
 }
 
-CUDA_PREFIX float rssDistance(const Matrix3* R, const Vector3* t,
+CUDA_PREFIX float rssDistance(const float R[3][3], const float t[3],
 						const RSS* a, const RSS* b, DistRSSVars* p_var)
 {
   float vert_a[4][3];
   float vert_b[4][3];
 
-  transformPoints(R, t, a, vert_a);
-  getPoints(b, vert_b);
+  transformPoints(R, t, b, vert_b);
+  getPoints(a, vert_a);
 
   float d[4];
   Triangle a1, a2, b1, b2;

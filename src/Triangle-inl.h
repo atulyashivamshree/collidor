@@ -213,7 +213,36 @@ CUDA_PREFIX float TriDist(float P[3], float Q[3],
 }
 
 
-CUDA_PREFIX float distTriangles(const Triangle* s1, const Triangle *s2, 
+CUDA_PREFIX float distTriangles(const Triangle* s1, const Triangle *s2,
+                        const float R[3][3], const float t[3],
+                        DistTriangleVars* p_var)
+{
+
+  p_var->S[0][0] = s1->a.x;
+  p_var->S[0][1] = s1->a.y;
+  p_var->S[0][2] = s1->a.z;
+  p_var->S[1][0] = s1->b.x;
+  p_var->S[1][1] = s1->b.y;
+  p_var->S[1][2] = s1->b.z;
+  p_var->S[2][0] = s1->c.x;
+  p_var->S[2][1] = s1->c.y;
+  p_var->S[2][2] = s1->c.z;
+
+  float s2_a[3] = {s2->a.x, s2->a.y, s2->a.z};
+  float s2_b[3] = {s2->b.x, s2->b.y, s2->b.z};
+  float s2_c[3] = {s2->c.x, s2->c.y, s2->c.z};
+  
+  MxV(p_var->T[0], R, s2_a);
+  VpV(p_var->T[0], p_var->T[0], t);
+  MxV(p_var->T[1], R, s2_b);
+  VpV(p_var->T[1], p_var->T[1], t);
+  MxV(p_var->T[2], R, s2_c);
+  VpV(p_var->T[2], p_var->T[2], t);
+
+
+  return TriDist(p_var->X, p_var->Y, p_var->S, p_var->T, &p_var->tri_dist_vars);
+}
+CUDA_PREFIX float distTriangles(const Triangle* s1, const Triangle *s2,
                         DistTriangleVars* p_var)
 {
 
@@ -237,6 +266,5 @@ CUDA_PREFIX float distTriangles(const Triangle* s1, const Triangle *s2,
   p_var->T[2][1] = s2->c.y;
   p_var->T[2][2] = s2->c.z;
 
-
-  return TriDist(p_var->X, p_var->Y, p_var->T, p_var->S, &p_var->tri_dist_vars);
+  return TriDist(p_var->X, p_var->Y, p_var->S, p_var->T, &p_var->tri_dist_vars);
 }

@@ -22,6 +22,12 @@ const int NUM_CHECK = 1000000;
 const int STRESS_CHECK = 10000;
 const float EPSILON = 5e-5;
 
+const float matI_[3][3] = {1,0,0,0,1,0,0,0,1};
+const float matR1_[3][3] = {sqrt(2)/2,sqrt(2)/2,0, -sqrt(2)/2,sqrt(2)/2,0, 0,0,1};
+
+const float t0_[3] = {0,0,0};
+const float t1_[3] = {1,0,0};
+
 HOST_PREFIX std::ostream& operator<<(std::ostream& os, Triangle tri);
 
 HOST_PREFIX Eigen::Vector3f getVector3(Vector3 v)
@@ -34,12 +40,28 @@ HOST_PREFIX bool approx_equal(float a, float b, float epsilon = EPSILON)
   return (std::abs(a - b) < epsilon);
 }
 
-HOST_PREFIX float distTriangles_fcl(Triangle s1, Triangle s2)
+HOST_PREFIX float distTriangles_fcl(Triangle s1, Triangle s2, const float R[3][3], const float t[3])
 {
   Eigen::Vector3f p, q;
+  fcl::Matrix3f R_;
+  fcl::Vector3f Tl_;
+  R_(0,0) = R[0][0];
+  R_(0,1) = R[0][1];
+  R_(0,2) = R[0][2];
+  R_(1,0) = R[1][0];
+  R_(1,1) = R[1][1];
+  R_(1,2) = R[1][2];
+  R_(2,0) = R[2][0];
+  R_(2,1) = R[2][1];
+  R_(2,2) = R[2][2];
+
+  Tl_(0) = t[0];
+  Tl_(1) = t[1];
+  Tl_(2) = t[2];
   return fcl::detail::TriangleDistance<float>::triDistance(
                       getVector3(s1.a), getVector3(s1.b), getVector3(s1.c),
                       getVector3(s2.a), getVector3(s2.b), getVector3(s2.c),
+                      R_, Tl_,
                       p, q);
 }
 
@@ -58,23 +80,36 @@ HOST_PREFIX void test_triangles_2D()
   // totally inside
   Triangle p1({{0,6,0}, {6,0,0}, {0,0,0}});
   Triangle q1({{1,1,0}, {2,1,0}, {2,2,0}});
-  cout << "Triangle distance inside " <<  distTriangles_fcl(p1, q1) << endl;
-  assert(approx_equal(distTriangles_fcl(p1, q1), 0));
-  assert(approx_equal(DIST_TRIANGLES(&p1, &q1, &preset_var), 0));
+  cout << "Triangle distance inside " <<  distTriangles_fcl(p1, q1, matI_, t0_) << endl;
+  assert(approx_equal(distTriangles_fcl(p1, q1, matI_, t0_), 0));
+  assert(approx_equal(DIST_TRIANGLES(&p1, &q1, matI_, t0_, &preset_var), 0));
 
   // first distance
   Triangle p2({{0,2,0}, {2,0,0}, {0,0,0}});
-  Triangle q2({{2,1,0}, {2,4,0}, {2,6,0}});
-  cout << "Triangle distance away " <<  distTriangles_fcl(p2, q2) << endl;
-  assert(approx_equal(distTriangles_fcl(p2, q2), sqrt(2)/2));
-  assert(approx_equal(DIST_TRIANGLES(&p2, &q2, &preset_var), sqrt(2)/2));
+  Triangle q2({{2,1,0}, {2,4,0}, {6,1,0}});
+  cout << "Triangle distance away " <<  distTriangles_fcl(p2, q2, matI_, t0_) << endl;
+  assert(approx_equal(distTriangles_fcl(p2, q2, matI_, t0_), sqrt(2)/2));
+  assert(approx_equal(DIST_TRIANGLES(&p2, &q2, matI_, t0_, &preset_var), sqrt(2)/2));
 
   // first intersection
   Triangle p3({{7,3,0}, {6,0,0}, {0,0,0}});
   Triangle q3({{1,1,0}, {4,4,0}, {6,2,0}});
-  cout << "Triangle distance intersect " <<  distTriangles_fcl(p3, q3) << endl;
-  assert(approx_equal(distTriangles_fcl(p3, q3), 0));
-  assert(approx_equal(DIST_TRIANGLES(&p3, &q3, &preset_var), 0));
+  cout << "Triangle distance intersect " <<  distTriangles_fcl(p3, q3, matI_, t0_) << endl;
+  assert(approx_equal(distTriangles_fcl(p3, q3, matI_, t0_), 0));
+  assert(approx_equal(DIST_TRIANGLES(&p3, &q3, matI_, t0_, &preset_var), 0));
+
+  Triangle p4({{0,2,0}, {2,0,0}, {0,0,0}});
+  Triangle q4({{2,1,0}, {2,4,0}, {6,1,0}});
+  cout << "Triangle distance away " <<  distTriangles_fcl(p4, q4, matI_, t1_) << endl;
+  assert(approx_equal(distTriangles_fcl(p4, q4, matI_, t1_), sqrt(2)));
+  assert(approx_equal(DIST_TRIANGLES(&p4, &q4, matI_, t1_, &preset_var), sqrt(2)));
+
+  Triangle p5({{0,2,0}, {2,0,0}, {0,0,0}});
+  Triangle q5({{2,1,0}, {2,4,0}, {6,1,0}});
+  cout << "Triangle distance away " <<  distTriangles_fcl(q5, p5, matR1_, t0_) << endl;
+  cout << "Triangle distance away " <<  DIST_TRIANGLES(&q5, &p5, matR1_, t0_, &preset_var) << endl;
+  assert(approx_equal(distTriangles_fcl(q5, p5, matR1_, t0_), 2 - sqrt(2)));
+  assert(approx_equal(DIST_TRIANGLES(&q5, &p5, matR1_, t0_, &preset_var), 2 - sqrt(2)));
 
   cout << "Test Triangeles 2D : PASSED" << endl;
 
@@ -86,29 +121,29 @@ HOST_PREFIX void test_triangles_3D()
   // totally inside
   Triangle p1({{0,2,0}, {2,0,0}, {0,0,0}});
   Triangle q1({{-0.5,-0.5,2}, {2.5,2.5,2}, {0.5,0.5,-2}});
-  cout << "Triangle distance inside " <<  distTriangles_fcl(p1, q1) << endl;
-  assert(approx_equal(distTriangles_fcl(p1, q1), 0));
-  assert(approx_equal(DIST_TRIANGLES(&p1, &q1, &preset_var), 0));
+  cout << "Triangle distance inside " <<  distTriangles_fcl(p1, q1, matI_, t0_) << endl;
+  assert(approx_equal(distTriangles_fcl(p1, q1, matI_, t0_), 0));
+  assert(approx_equal(DIST_TRIANGLES(&p1, &q1, matI_, t0_, &preset_var), 0));
 
   // first distance
   Triangle p2({{0,2,0}, {2,0,0}, {0,0,0}});
   Triangle q2({{-0.5,-0.5,2}, {2.5,2.5,2}, {0.5,0.5,0}});
-  cout << "Triangle distance away " <<  distTriangles_fcl(p2, q2) << endl;
-  assert(approx_equal(distTriangles_fcl(p2, q2), 0));
-  assert(approx_equal(DIST_TRIANGLES(&p2, &q2, &preset_var), 0));
+  cout << "Triangle distance away " <<  distTriangles_fcl(p2, q2, matI_, t0_) << endl;
+  assert(approx_equal(distTriangles_fcl(p2, q2, matI_, t0_), 0));
+  assert(approx_equal(DIST_TRIANGLES(&p2, &q2, matI_, t0_, &preset_var), 0));
 
   // first intersection
   Triangle p3({{0,2,0}, {2,0,0}, {0,0,0}});
   Triangle q3({{-0.5,-0.5,2}, {2.5,2.5,2}, {0.5,0.5,0.25}});
-  cout << "Triangle distance intersect " <<  distTriangles_fcl(p3, q3) << endl;
-  assert(approx_equal(distTriangles_fcl(p3, q3), 0.25));
-  assert(approx_equal(DIST_TRIANGLES(&p3, &q3, &preset_var), 0.25));
+  cout << "Triangle distance intersect " <<  distTriangles_fcl(p3, q3, matI_, t0_) << endl;
+  assert(approx_equal(distTriangles_fcl(p3, q3, matI_, t0_), 0.25));
+  assert(approx_equal(DIST_TRIANGLES(&p3, &q3, matI_, t0_, &preset_var), 0.25));
 
   Triangle p4({{0,2,0}, {2,0,0}, {0,0,0}});
   Triangle q4({{4.5,4.5,2}, {2.5,2.5,2}, {2.5,2.5,-1}});
-  cout << "Triangle distance intersect " <<  distTriangles_fcl(p4, q4) << endl;
-  assert(approx_equal(distTriangles_fcl(p4, q4), 1.5*sqrt(2)));
-  assert(approx_equal(DIST_TRIANGLES(&p4, &q4, &preset_var), 1.5*sqrt(2)));
+  cout << "Triangle distance intersect " <<  distTriangles_fcl(p4, q4, matI_, t0_) << endl;
+  assert(approx_equal(distTriangles_fcl(p4, q4, matI_, t0_), 1.5*sqrt(2)));
+  assert(approx_equal(DIST_TRIANGLES(&p4, &q4, matI_, t0_, &preset_var), 1.5*sqrt(2)));
 
   cout << "Test Triangeles 3D : PASSED" << endl;
 
@@ -145,8 +180,26 @@ HOST_PREFIX void test_stress_random()
     generateRandomTriangle(&s1);
     generateRandomTriangle(&s2);
 
-    float correct = distTriangles_fcl(s1, s2);
-    float actual = DIST_TRIANGLES(&s1, &s2, &preset_var);
+    Eigen::Vector3f angles = Eigen::Vector3f::Random();
+    Eigen::Vector3f pos = Eigen::Vector3f::Random();
+
+    Eigen::AngleAxisf rollAngle(angles(0), Eigen::Vector3f::UnitZ());
+    Eigen::AngleAxisf yawAngle(angles(1), Eigen::Vector3f::UnitY());
+    Eigen::AngleAxisf pitchAngle(angles(2), Eigen::Vector3f::UnitX());
+    Eigen::Quaternion<float> q = rollAngle * yawAngle * pitchAngle;
+    Eigen::Matrix3f R = q.matrix();
+
+    float matR[3][3], translation[3];
+    matR[0][0] = R(0,0); matR[0][1] = R(0,1); matR[0][2] = R(0,2);
+    matR[1][0] = R(1,0); matR[1][1] = R(1,1); matR[1][2] = R(1,2);
+    matR[2][0] = R(2,0); matR[2][1] = R(2,1); matR[2][2] = R(2,2);
+
+    translation[0] = pos(0);
+    translation[1] = pos(1);
+    translation[2] = pos(2);
+
+    float correct = distTriangles_fcl(s1, s2, matR, translation);
+    float actual = DIST_TRIANGLES(&s1, &s2, matR, translation, &preset_var);
 
     if(!approx_equal(actual, correct))
     {

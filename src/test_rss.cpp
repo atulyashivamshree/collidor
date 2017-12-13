@@ -13,9 +13,9 @@ using namespace std;
 int main(int argc, char *argv[])
 {
   // call all test functions
-//  test_triangles_2D();
-//  test_triangles_3D();
-//  test_stress_random();
+  test_triangles_2D();
+  test_triangles_3D();
+  test_stress_random();
 
   test_rectangles_2D();
   test_rectangles_3D();

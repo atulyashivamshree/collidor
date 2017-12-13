@@ -36,7 +36,7 @@ struct RSSResult
 };
 
 
-CUDA_PREFIX float rssDistance(const Matrix3* R, const Vector3* t,
+CUDA_PREFIX float rssDistance(const float R[3][3], const float t[3],
 						const RSS* a, const RSS* b, DistRSSVars* d);
 
 #include "RSS-inl.h"

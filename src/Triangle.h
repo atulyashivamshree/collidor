@@ -72,7 +72,11 @@ struct DistTriangleVars
   TriDistVars tri_dist_vars;
 };
 
-CUDA_PREFIX INLINE_PREFIX float distTriangles(const Triangle* s1, const Triangle *s2, 
+CUDA_PREFIX INLINE_PREFIX float distTriangles(const Triangle* s1, const Triangle *s2,
+                        DistTriangleVars* p_var);
+
+CUDA_PREFIX INLINE_PREFIX float distTriangles(const Triangle* s1, const Triangle *s2,
+						const float R[3][3], const float t[3],
                         DistTriangleVars* p_var);
 
 #include "Triangle-inl.h"
