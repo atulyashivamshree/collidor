@@ -160,6 +160,4 @@ void loadBVH(std::istream& is, BVH* bvh){
 		is >> bvh->tri_arr[i];
 }
 
-
-
 #endif /* BVH_INL_H_ */

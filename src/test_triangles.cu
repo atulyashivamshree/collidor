@@ -6,9 +6,6 @@
 #include <cassert>
 #include <iostream>
 #include <iomanip>
-#include <cstdlib>
-#include <time.h>
-#include <sys/time.h>
 
 #include "Triangle.h"
 float distTrianglesGPU(const Triangle*, const Triangle* , DistTriangleVars*);
@@ -17,12 +14,12 @@ float distTrianglesGPU(const Triangle*, const Triangle* , DistTriangleVars*);
 #define DIST_TRIANGLES distTrianglesGPU
 #include "Triangles_test.h"
 
+#include "Triangle-cuda-inl.h"
+
 using namespace std;
 
 const int size_tri = sizeof(Triangle);
-const int BLOCKSIZE = 32;
 
-double get_wall_time();
 // single case timing
 void testSingleTiming();
 // multiple instances of same in sequence
@@ -31,45 +28,6 @@ void testMultipleSerial();
 void testMultipleSame();
 // Check collision within an array of random triangles
 void testMultipleRandom();
-
-struct Result
-{
-  float dist;
-};
-
-__global__ void computeDistance(const Triangle *s1, const Triangle* s2, Result* res)
-{
-  __shared__ Triangle loc_s1;
-  __shared__ Triangle loc_s2;
-  __shared__ DistTriangleVars vars;
-  loc_s1 = *s1;
-  loc_s2 = *s2;
-  // res->dist = 1e-6 + distTriangles(s1, s2, &vars);
-  float dist = distTriangles(&loc_s1, &loc_s2, &vars);
-  res->dist = dist;
-
-}
-
-__global__ void computeDistanceArray(
-                    const Triangle *arr_s1, const Triangle* arr_s2, 
-                      Result* arr_res, int n)
-{
-  int t_j = threadIdx.y;
-  int g_j = blockIdx.y * blockDim.y + threadIdx.y;
-
-  if(g_j < n)
-  {
-    __shared__ Triangle s1[BLOCKSIZE];
-    __shared__ Triangle s2[BLOCKSIZE];
-    __shared__ DistTriangleVars vars[BLOCKSIZE];
-    s1[t_j] = arr_s1[g_j];
-    s2[t_j] = arr_s2[g_j];
-    // res->dist = 1e-6 + distTriangles(s1, s2, &vars);
-    float dist = distTriangles(&s1[t_j], &s2[t_j], &vars[t_j]);
-    arr_res[g_j].dist = dist;
-  }
-
-}
 
 int main(int argc, char *argv[])
 {
@@ -95,16 +53,16 @@ HOST_PREFIX float distTrianglesGPU(const Triangle* h_s1, const Triangle* h_s2, D
 
   cudaMalloc(&d_s1, size_tri);
   cudaMalloc(&d_s2, size_tri);
-  Result *d_res;
-  Result h_res;
-  cudaMalloc(&d_res, sizeof(Result));
+  TriangleResult *d_res;
+  TriangleResult h_res;
+  cudaMalloc(&d_res, sizeof(TriangleResult));
 
   cudaMemcpy(d_s1, h_s1, size_tri, cudaMemcpyHostToDevice);
   cudaMemcpy(d_s2, h_s2, size_tri, cudaMemcpyHostToDevice);
 
   computeDistance<<<1, 1>>>(d_s1, d_s2, d_res);
 
-  cudaMemcpy(&h_res, d_res, sizeof(Result), cudaMemcpyDeviceToHost);
+  cudaMemcpy(&h_res, d_res, sizeof(TriangleResult), cudaMemcpyDeviceToHost);
 
   cudaFree(d_s1);
   cudaFree(d_s2);
@@ -128,9 +86,9 @@ void testSingleTiming()
 
   cudaMalloc(&d_s1, size_tri);
   cudaMalloc(&d_s2, size_tri);
-  Result *d_res;
-  Result h_res;
-  cudaMalloc(&d_res, sizeof(Result));
+  TriangleResult *d_res;
+  TriangleResult h_res;
+  cudaMalloc(&d_res, sizeof(TriangleResult));
   
   double t_init = get_wall_time();
 
@@ -142,7 +100,7 @@ void testSingleTiming()
   cudaDeviceSynchronize();
   double t_cuda_end = get_wall_time();
 
-  cudaMemcpy(&h_res, d_res, sizeof(Result), cudaMemcpyDeviceToHost);
+  cudaMemcpy(&h_res, d_res, sizeof(TriangleResult), cudaMemcpyDeviceToHost);
 
   // float t_results;
   // cudaEventElapsedTime(&t_results, start, results);
@@ -173,9 +131,9 @@ void testMultipleSerial()
 
   cudaMalloc(&d_s1, size_tri);
   cudaMalloc(&d_s2, size_tri);
-  Result *d_res;
-  Result h_res;
-  cudaMalloc(&d_res, sizeof(Result));
+  TriangleResult *d_res;
+  TriangleResult h_res;
+  cudaMalloc(&d_res, sizeof(TriangleResult));
   
   double t_init = get_wall_time();
 
@@ -188,7 +146,7 @@ void testMultipleSerial()
   cudaDeviceSynchronize();
   double t_cuda_end = get_wall_time();
 
-  cudaMemcpy(&h_res, d_res, sizeof(Result), cudaMemcpyDeviceToHost);
+  cudaMemcpy(&h_res, d_res, sizeof(TriangleResult), cudaMemcpyDeviceToHost);
 
   // float t_results;
   // cudaEventElapsedTime(&t_results, start, results);
@@ -210,8 +168,11 @@ void testMultipleSame()
   double t_start = get_wall_time();
 
   // A is the input to every stage while C is the output after every stage
-  Triangle h_s1[NUM_CHECK], h_s2[NUM_CHECK];
+  Triangle *h_s1, *h_s2;
   Triangle* d_s1, *d_s2;
+
+  h_s1 = new Triangle[NUM_CHECK];
+  h_s2 = new Triangle[NUM_CHECK];
 
   generateRandomTriangle(&h_s1[0]);
   generateRandomTriangle(&h_s2[0]);
@@ -234,9 +195,9 @@ void testMultipleSame()
 
   cudaMalloc(&d_s1, NUM_CHECK*size_tri);
   cudaMalloc(&d_s2, NUM_CHECK*size_tri);
-  Result *d_res;
-  Result h_res[NUM_CHECK];
-  cudaMalloc(&d_res, NUM_CHECK*sizeof(Result));
+  TriangleResult *d_res;
+  TriangleResult *h_res = new TriangleResult[NUM_CHECK];
+  cudaMalloc(&d_res, NUM_CHECK*sizeof(TriangleResult));
   
   double t_init = get_wall_time();
 
@@ -251,7 +212,7 @@ void testMultipleSame()
   cudaDeviceSynchronize();
   double t_cuda_end = get_wall_time();
 
-  cudaMemcpy(&h_res, d_res, NUM_CHECK*sizeof(Result), cudaMemcpyDeviceToHost);
+  cudaMemcpy(h_res, d_res, NUM_CHECK*sizeof(TriangleResult), cudaMemcpyDeviceToHost);
 
   // float t_results;
   // cudaEventElapsedTime(&t_results, start, results);
@@ -273,6 +234,10 @@ void testMultipleSame()
   cudaFree(d_s2);
   cudaFree(d_res);
 
+  delete[] h_s1;
+  delete[] h_s2;
+  delete[] h_res;
+
 }
 
 void testMultipleRandom()
@@ -282,8 +247,11 @@ void testMultipleRandom()
   double t_start = get_wall_time();
 
   // A is the input to every stage while C is the output after every stage
-  Triangle h_s1[NUM_CHECK], h_s2[NUM_CHECK];
+  Triangle *h_s1, *h_s2;
   Triangle* d_s1, *d_s2;
+
+  h_s1 = new Triangle[NUM_CHECK];
+  h_s2 = new Triangle[NUM_CHECK];
 
   for(int i = 0; i < NUM_CHECK; i++)
   {
@@ -295,9 +263,9 @@ void testMultipleRandom()
 
   cudaMalloc(&d_s1, NUM_CHECK*size_tri);
   cudaMalloc(&d_s2, NUM_CHECK*size_tri);
-  Result *d_res;
-  Result h_res[NUM_CHECK];
-  cudaMalloc(&d_res, NUM_CHECK*sizeof(Result));
+  TriangleResult *d_res;
+  TriangleResult *h_res = new TriangleResult[NUM_CHECK];
+  cudaMalloc(&d_res, NUM_CHECK*sizeof(TriangleResult));
   
   double t_init = get_wall_time();
 
@@ -312,7 +280,7 @@ void testMultipleRandom()
   cudaDeviceSynchronize();
   double t_cuda_end = get_wall_time();
 
-  cudaMemcpy(&h_res, d_res, NUM_CHECK*sizeof(Result), cudaMemcpyDeviceToHost);
+  cudaMemcpy(h_res, d_res, NUM_CHECK*sizeof(TriangleResult), cudaMemcpyDeviceToHost);
 
   // float t_results;
   // cudaEventElapsedTime(&t_results, start, results);
@@ -335,13 +303,8 @@ void testMultipleRandom()
   cudaFree(d_s2);
   cudaFree(d_res);
 
-}
+  delete[] h_s1;
+  delete[] h_s2;
+  delete[] h_res;
 
-HOST_PREFIX double get_wall_time(){
-    struct timeval time;
-    if (gettimeofday(&time,NULL)){
-        //  Handle error
-        return 0;
-    }
-    return (double)time.tv_sec + (double)time.tv_usec * .000001;
 }

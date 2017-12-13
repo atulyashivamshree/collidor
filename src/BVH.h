@@ -13,10 +13,11 @@
 
 // stores a BV and its child information
 
-struct id_pair
+struct Task
 {
   int i1;
   int i2;
+  float dist;
 };
 
 struct BV
@@ -30,24 +31,19 @@ struct BV
 struct BVH
 {
   BV *bv_arr;
-  int num_bv;
+  unsigned int num_bv;
 
   Triangle *tri_arr;
-  int num_tri;
+  unsigned int num_tri;
 };
 
-struct BVQueue
+struct Queue
 {
-  id_pair *queue;
-  int num_BV;
-  int max_capacity;
-};
-
-struct BVLeafQueue
-{
-  id_pair *queue;
-  int num_tri;
-  int max_capacity;
+  Task *arr;
+  unsigned int start;
+  unsigned int last;
+  unsigned int size;
+  unsigned int max_capacity;
 };
 
 // probably move them to BVH-cuda.cu
@@ -59,11 +55,8 @@ void initializeBVH(BVH *bv);
 // deletes a BVH from memory
 void deleteBVH(BVH *bv);
 
-//// initialize the BV and Leaf Queue
-//void initializeQueue(BVQueue *bvq , int num_bvq,
-//		     BVLeafQueue *leafq, int num_leafq);
-//
-//void
+// the main function that computes distance between two BVHs
+void computeDistance(const BVH* bvh1, const BVH* bvh2);
 
 // saves the BVH object to a file
 void saveBVH(std::ostream& os, const BVH* bvh);

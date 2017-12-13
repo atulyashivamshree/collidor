@@ -24,6 +24,11 @@ struct LineSegVars
   float denom;
 };
 
+struct TriangleResult
+{
+  float dist;
+};
+
 struct TriDistVars
 {
   float Sv[3][3];

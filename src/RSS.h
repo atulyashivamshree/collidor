@@ -29,6 +29,12 @@ struct DistRSSVars
 	DistTriangleVars dist_triangle_vars;
 };
 
+struct RSSResult
+{
+  float dist;
+};
+
+
 CUDA_PREFIX float rssDistance(const Matrix3* R, const Vector3* t,
 						const RSS* a, const RSS* b, DistRSSVars* d);
 

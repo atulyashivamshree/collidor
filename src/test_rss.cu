@@ -6,9 +6,6 @@
 #include <cassert>
 #include <iostream>
 #include <iomanip>
-#include <cstdlib>
-#include <time.h>
-#include <sys/time.h>
 
 #include "RSS.h"
 float distTrianglesGPU(const Triangle*, const Triangle* , DistTriangleVars*);
@@ -21,12 +18,12 @@ float distRSSGPU(const Matrix3* R, const Vector3* t,
 #define DIST_RSS distRSSGPU
 #include "Rectangle_tests.h"
 
+#include "RSS-cuda-inl.h"
+
 using namespace std;
 
 const int size_rss = sizeof(RSS);
-const int BLOCKSIZE = 32;
 
-double get_wall_time();
 // single case timing
 void testSingleTiming();
 // multiple instances of same in sequence
@@ -35,61 +32,6 @@ void testMultipleSerial();
 void testMultipleSame();
 // Check collision within an array of random triangles
 void testMultipleRandom();
-
-struct Result
-{
-  float dist;
-};
-
-__global__ void computeDistance(const Matrix3* R, const Vector3* t,
-                    const RSS *r1, const RSS* d2, Result* res)
-{
-  __shared__ Matrix3 loc_R;
-  __shared__ Vector3 loc_t;
-  __shared__ RSS loc_r1;
-  __shared__ RSS loc_d2;
-  __shared__ DistRSSVars vars;
-
-  loc_R = *R;
-  loc_t = *t;
-
-  loc_r1 = *r1;
-  loc_d2 = *d2;
-  // res->dist = 1e-6 + distRSSs(r1, d2, &vars);
-  float dist = rssDistance(&loc_R, &loc_t, &loc_r1, &loc_d2, &vars);
-  res->dist = dist;
-
-}
-
-__global__ void computeDistanceArray(const Matrix3* R, const Vector3* t,
-                    const RSS *arr_r1, const RSS* arr_d2, 
-                      Result* arr_res, int n)
-{
-  int t_j = threadIdx.y;
-  int g_j = blockIdx.y * blockDim.y + threadIdx.y;
-
-  __shared__ Matrix3 loc_R;
-  __shared__ Vector3 loc_t;
-  __shared__ RSS r1[BLOCKSIZE];
-  __shared__ RSS d2[BLOCKSIZE];
-  __shared__ DistRSSVars vars[BLOCKSIZE];
-
-  if(threadIdx.y == 0)
-  {
-    loc_R = *R;
-    loc_t = *t;
-  }
-
-  if(g_j < n)
-  {
-    r1[t_j] = arr_r1[g_j];
-    d2[t_j] = arr_d2[g_j];
-    // res->dist = 1e-6 + distRSSs(r1, d2, &vars);
-    float dist = rssDistance(&loc_R, &loc_t, &r1[t_j], &d2[t_j], &vars[t_j]);
-    arr_res[g_j].dist = dist;
-  }
-
-}
 
 int main(int argc, char *argv[])
 {
@@ -128,9 +70,9 @@ HOST_PREFIX float distRSSGPU(const Matrix3* R, const Vector3* t,
   cudaMalloc(&d_t, sizeof(Vector3));
   cudaMalloc(&d_r1, size_rss);
   cudaMalloc(&d_r2, size_rss);
-  Result *d_res;
-  Result h_res;
-  cudaMalloc(&d_res, sizeof(Result));
+  RSSResult *d_res;
+  RSSResult h_res;
+  cudaMalloc(&d_res, sizeof(RSSResult));
 
   cudaMemcpy(d_R, R, sizeof(Matrix3), cudaMemcpyHostToDevice);
   cudaMemcpy(d_t, t, sizeof(Vector3), cudaMemcpyHostToDevice);
@@ -139,7 +81,7 @@ HOST_PREFIX float distRSSGPU(const Matrix3* R, const Vector3* t,
 
   computeDistance<<<1, 1>>>(d_R, d_t, d_r1, d_r2, d_res);
 
-  cudaMemcpy(&h_res, d_res, sizeof(Result), cudaMemcpyDeviceToHost);
+  cudaMemcpy(&h_res, d_res, sizeof(RSSResult), cudaMemcpyDeviceToHost);
 
   cudaFree(d_r1);
   cudaFree(d_r2);
@@ -170,9 +112,9 @@ void testSingleTiming()
   cudaMalloc(&d_t, sizeof(Vector3));
   cudaMalloc(&d_r1, size_rss);
   cudaMalloc(&d_r2, size_rss);
-  Result *d_res;
-  Result h_res;
-  cudaMalloc(&d_res, sizeof(Result));
+  RSSResult *d_res;
+  RSSResult h_res;
+  cudaMalloc(&d_res, sizeof(RSSResult));
   
   double t_init = get_wall_time();
 
@@ -186,7 +128,7 @@ void testSingleTiming()
   cudaDeviceSynchronize();
   double t_cuda_end = get_wall_time();
 
-  cudaMemcpy(&h_res, d_res, sizeof(Result), cudaMemcpyDeviceToHost);
+  cudaMemcpy(&h_res, d_res, sizeof(RSSResult), cudaMemcpyDeviceToHost);
 
   // float t_results;
   // cudaEventElapsedTime(&t_results, start, results);
@@ -223,9 +165,9 @@ void testMultipleSerial()
   cudaMalloc(&d_t, sizeof(Vector3));
   cudaMalloc(&d_r1, size_rss);
   cudaMalloc(&d_r2, size_rss);
-  Result *d_res;
-  Result h_res;
-  cudaMalloc(&d_res, sizeof(Result));
+  RSSResult *d_res;
+  RSSResult h_res;
+  cudaMalloc(&d_res, sizeof(RSSResult));
   
   double t_init = get_wall_time();
 
@@ -240,7 +182,7 @@ void testMultipleSerial()
   cudaDeviceSynchronize();
   double t_cuda_end = get_wall_time();
 
-  cudaMemcpy(&h_res, d_res, sizeof(Result), cudaMemcpyDeviceToHost);
+  cudaMemcpy(&h_res, d_res, sizeof(RSSResult), cudaMemcpyDeviceToHost);
 
   // float t_results;
   // cudaEventElapsedTime(&t_results, start, results);
@@ -300,10 +242,10 @@ void testMultipleSame()
   cudaMalloc(&d_t, sizeof(Vector3));
   cudaMalloc(&d_r1, NUM_CHECK*size_rss);
   cudaMalloc(&d_r2, NUM_CHECK*size_rss);
-  Result *d_res;
-  Result *h_res;
-  h_res = new Result[NUM_CHECK];
-  cudaMalloc(&d_res, NUM_CHECK*sizeof(Result));
+  RSSResult *d_res;
+  RSSResult *h_res;
+  h_res = new RSSResult[NUM_CHECK];
+  cudaMalloc(&d_res, NUM_CHECK*sizeof(RSSResult));
   
   double t_init = get_wall_time();
 
@@ -321,7 +263,7 @@ void testMultipleSame()
   cudaDeviceSynchronize();
   double t_cuda_end = get_wall_time();
 
-  cudaMemcpy(h_res, d_res, NUM_CHECK*sizeof(Result), cudaMemcpyDeviceToHost);
+  cudaMemcpy(h_res, d_res, NUM_CHECK*sizeof(RSSResult), cudaMemcpyDeviceToHost);
 
   // float t_results;
   // cudaEventElapsedTime(&t_results, start, results);
@@ -389,10 +331,10 @@ void testMultipleRandom()
   cudaMalloc(&d_t, sizeof(Vector3));
   cudaMalloc(&d_r1, NUM_CHECK*size_rss);
   cudaMalloc(&d_r2, NUM_CHECK*size_rss);
-  Result *d_res;
-  Result *h_res;
-  h_res = new Result[NUM_CHECK];
-  cudaMalloc(&d_res, NUM_CHECK*sizeof(Result));
+  RSSResult *d_res;
+  RSSResult *h_res;
+  h_res = new RSSResult[NUM_CHECK];
+  cudaMalloc(&d_res, NUM_CHECK*sizeof(RSSResult));
   
   double t_init = get_wall_time();
 
@@ -410,7 +352,7 @@ void testMultipleRandom()
   cudaDeviceSynchronize();
   double t_cuda_end = get_wall_time();
 
-  cudaMemcpy(h_res, d_res, NUM_CHECK*sizeof(Result), cudaMemcpyDeviceToHost);
+  cudaMemcpy(h_res, d_res, NUM_CHECK*sizeof(RSSResult), cudaMemcpyDeviceToHost);
 
   // float t_results;
   // cudaEventElapsedTime(&t_results, start, results);
@@ -429,7 +371,7 @@ void testMultipleRandom()
 
   cout << count_correct << "/" << NUM_CHECK << " are correct" << endl;
   cout << setprecision(5);
-  cout << "Wall time multiple same(" << NUM_CHECK << "): " << (t_cuda_end - t_init )*1000 << "ms" <<  endl;
+  cout << "Wall time multiple random(" << NUM_CHECK << "): " << (t_cuda_end - t_init )*1000 << "ms" <<  endl;
   cout << endl;
 
   cudaFree(d_r1);
@@ -439,13 +381,4 @@ void testMultipleRandom()
   delete[] h_r1;
   delete[] h_r2;
   delete[] h_res;
-}
-
-HOST_PREFIX double get_wall_time(){
-    struct timeval time;
-    if (gettimeofday(&time,NULL)){
-        //  Handle error
-        return 0;
-    }
-    return (double)time.tv_sec + (double)time.tv_usec * .000001;
 }
