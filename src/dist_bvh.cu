@@ -31,11 +31,10 @@ __host__ int main(int argc, char *argv[])
   BVH bvh1, bvh2;
   loadData(argv[1], argv[2], bvh1, bvh2);
 
-  Matrix3 I({{1,0,0}, {0,1,0}, {0,0,1}});
-  Vector3 p({0,0,0});
-  Config cfg({0.4, 15, I, p, 0});
+  Config cfg({0.4, 15, {1,0,0, 0,1,0, 0,0,1}, {0,0,0}, 0});
 
-  DistanceResult result = computeDistance(&bvh1, &bvh2, cfg);
+  DistanceResult result = computeDistance(&bvh1, &bvh2, cfg, 
+                              string(argv[3]) + ".outp.csv");
 
   cout << "==== RESULTS ====" << endl;
   cout << "dist: " << result.dist << " stop " << result.stop << endl;

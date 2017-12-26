@@ -20,7 +20,7 @@ clean:
 
 dist_bvh: $(SRC3) $(SRC4)
 	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) $(SRC3) -o dist_bvh.exe
-	./dist_bvh.exe ../CAD/sample1.bvh ../CAD/sample2.bvh
+	./dist_bvh.exe ../CAD/sample1.bvh ../CAD/sample2.bvh s1s2
 
 test_triangles:
 	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) $(SRC1) -o test_triangles.exe

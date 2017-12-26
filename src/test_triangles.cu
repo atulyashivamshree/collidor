@@ -7,8 +7,12 @@
 #include <iostream>
 #include <iomanip>
 
+#define BLOCKSIZE 32
+
 #include "Triangle.h"
-float distTrianglesGPU(const Triangle*, const Triangle* , DistTriangleVars*);
+float distTrianglesGPU(const Triangle*, const Triangle* ,
+                       const float R[3][3], const float t[3], 
+                       DistTriangleVars*);
 
 // use the test cases on the GPU triangles function
 #define DIST_TRIANGLES distTrianglesGPU
@@ -29,7 +33,7 @@ void testMultipleSame();
 // Check collision within an array of random triangles
 void testMultipleRandom();
 
-int main(int argc, char *argv[])
+__host__ int main(int argc, char *argv[])
 {
   
   cudaDeviceProp prop;
@@ -39,7 +43,7 @@ int main(int argc, char *argv[])
 
   test_triangles_2D();
   test_triangles_3D();
-  test_stress_random();
+  // test_stress_random();
 
   testSingleTiming();
   testMultipleSerial();
@@ -47,7 +51,9 @@ int main(int argc, char *argv[])
   testMultipleRandom();
 }
 
-HOST_PREFIX float distTrianglesGPU(const Triangle* h_s1, const Triangle* h_s2, DistTriangleVars*)
+HOST_PREFIX float distTrianglesGPU(const Triangle* h_s1, const Triangle* h_s2,
+                            const float R[3][3], const float t[3], 
+                            DistTriangleVars*)
 {
   Triangle *d_s1, *d_s2;
 
@@ -60,7 +66,7 @@ HOST_PREFIX float distTrianglesGPU(const Triangle* h_s1, const Triangle* h_s2, D
   cudaMemcpy(d_s1, h_s1, size_tri, cudaMemcpyHostToDevice);
   cudaMemcpy(d_s2, h_s2, size_tri, cudaMemcpyHostToDevice);
 
-  computeDistance<<<1, 1>>>(d_s1, d_s2, d_res);
+  computeDistanceSingle<<<1, 1>>>(d_s1, d_s2, d_res);
 
   cudaMemcpy(&h_res, d_res, sizeof(TriangleResult), cudaMemcpyDeviceToHost);
 
@@ -95,7 +101,7 @@ void testSingleTiming()
   cudaMemcpy(d_s1, &h_s1, size_tri, cudaMemcpyHostToDevice);
   cudaMemcpy(d_s2, &h_s2, size_tri, cudaMemcpyHostToDevice);
 
-  computeDistance<<<1, 1>>>(d_s1, d_s2, d_res);
+  computeDistanceSingle<<<1, 1>>>(d_s1, d_s2, d_res);
 
   cudaDeviceSynchronize();
   double t_cuda_end = get_wall_time();
@@ -141,7 +147,7 @@ void testMultipleSerial()
   cudaMemcpy(d_s2, &h_s2, size_tri, cudaMemcpyHostToDevice);
 
   for(int i = 0; i < NUM_CHECK; i++)
-    computeDistance<<<1, 1>>>(d_s1, d_s2, d_res);
+    computeDistanceSingle<<<1, 1>>>(d_s1, d_s2, d_res);
 
   cudaDeviceSynchronize();
   double t_cuda_end = get_wall_time();
@@ -183,14 +189,14 @@ void testMultipleSame()
     h_s2[i] = h_s2[0];
   }
 
-  float actual_res = distTriangles_fcl(h_s1[0], h_s2[0]);
+  float actual_res = distTriangles_fcl(h_s1[0], h_s2[0], matI_, t0_);
   // cout << "s1 " << h_s1[0];
   // cout << "s2 " << h_s2[0];
   // cout << "dist is " << actual_res << endl;
 
   // cout << "L: s1 " << h_s1[NUM_CHECK-1];
   // cout << "L: s2 " << h_s2[NUM_CHECK-1];
-  // cout << "L: dist is " << distTriangles_fcl(h_s1[NUM_CHECK-1],
+  // cout << "L: dist is " << distTriangles_fcl(h_s1[NUM_CHECK-1, matI_, t0_],
   //                            h_s2[NUM_CHECK-1]) << endl;
 
   cudaMalloc(&d_s1, NUM_CHECK*size_tri);
@@ -259,7 +265,7 @@ void testMultipleRandom()
     generateRandomTriangle(&h_s2[i]);
   }
 
-  float actual_res = distTriangles_fcl(h_s1[0], h_s2[0]);
+  float actual_res = distTriangles_fcl(h_s1[0], h_s2[0], matI_, t0_);
 
   cudaMalloc(&d_s1, NUM_CHECK*size_tri);
   cudaMalloc(&d_s2, NUM_CHECK*size_tri);
@@ -287,7 +293,7 @@ void testMultipleRandom()
   int count_correct = 0;
   for(int i = 0; i < NUM_CHECK; i++)
   {
-    float actual_dist = distTriangles_fcl(h_s1[i], h_s2[i]);
+    float actual_dist = distTriangles_fcl(h_s1[i], h_s2[i], matI_, t0_);
     if(approx_equal(h_res[i].dist, actual_dist))
       count_correct++;
     // cout << "actual: " << actual_res << " obtained: " << h_res[i].dist << endl;

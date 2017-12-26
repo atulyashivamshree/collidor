@@ -30,8 +30,8 @@ struct Config
 {
   float gamma;
   int dbg_size;
-  Matrix3 R;
-  Vector3 t;
+  float R[3][3];
+  float t[3];
   int enable_distance_reduction;  // set it to 0 to print get distance on all possible leaf elements without early termination
 };
 struct DebugVar
@@ -204,7 +204,7 @@ __global__ void processBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* c
     BV bvB = bvhB->bv_arr[t.i2];
 
     RSSResult res;
-    computeDistance(&cfg->R, &cfg->t, &bvA.rss, &bvB.rss, &res);
+    computeDistance(&bvA.rss, &bvB.rss, cfg->R, cfg->t, &res);
 
     bv_q->arr[arr_id].dist = res.id;
   }
@@ -223,7 +223,7 @@ __global__ void processLeafTasks(const BVH* bvhA, const BVH* bvhB, const Config*
     Triangle tB = bvhB->tri_arr[bvhB->bv_arr[t.i2].idt];
 
     TriangleResult res;
-    computeDistance(&cfg->R, &cfg->t, &tA, &tB, &res);
+    computeDistance(&tA, &tB, cfg->R, cfg->t, &res);
 
     leaf_q->arr[arr_id].dist = res.dist;
   }
@@ -251,7 +251,7 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   //   dbg_var[i].tsk.dist = i * 3.0;
   // 4
 
-  for(int i = 0;i < 4; i++)
+  for(int i = 0;i < 50; i++)
   {
     // PROCESS THE BV TREE NODE TASKS
     int num_bv_tasks = getSize(bv_queue);
@@ -302,7 +302,7 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   BV bvB = bvhB->bv_arr[0];
 
   RSSResult rss_res;
-  computeDistance(&cfg->R, &cfg->t, &bvA.rss, &bvB.rss, &rss_res);
+  computeDistance(&bvA.rss, &bvB.rss,cfg->R, cfg->t, &rss_res);
 
   for(int i = 0; i < 10; i++)
     dbg_var[i].tsk = bv_queue->arr[i];
@@ -335,7 +335,8 @@ void initializeResult(DistanceResult& result)
   result.stop = 0;
 }
 
-__host__ DistanceResult computeDistance(const BVH* bvh1, const BVH* bvh2, Config cfg)
+__host__ DistanceResult computeDistance(const BVH* bvh1, const BVH* bvh2, Config cfg,
+                                        std::string debg_queue_filename)
 {
   double t_init, t_copy1, t_run, t_copy2;
 
@@ -435,7 +436,7 @@ __host__ DistanceResult computeDistance(const BVH* bvh1, const BVH* bvh2, Config
   // print out all the queue info that was gathered
   std::ofstream of;
   of << std::setprecision(7);
-  of.open("output_queue.csv");
+  of.open(debg_queue_filename);
   of << "NUM_BV: " << h_bvq.last << " NUM_LEAF: " << h_leafq.last << endl;
   for(int i = 0;i < h_bvq.last; i++)
     of << h_bv_arr[i].i1 << " " << h_bv_arr[i].i2 << " " << h_bv_arr[i].dist << endl;
