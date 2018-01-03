@@ -19,7 +19,7 @@ using std::endl;
 const float SPACE_LOW = -1.0;
 const float SPACE_HIGH = 1.0;
 const int NUM_CHECK = 100;
-const int STRESS_CHECK = 10;
+const int STRESS_CHECK = 10000;
 const float EPSILON = 5e-5;
 
 const float matI_[3][3] = {1,0,0,0,1,0,0,0,1};
@@ -167,55 +167,55 @@ HOST_PREFIX void generateRandomTriangle(Triangle *tri)
   tri->c.z = v[8];
 }
 
-// HOST_PREFIX void test_stress_random()
-// {
-//   srand(static_cast<unsigned> (time(NULL)));
+ HOST_PREFIX void test_stress_random()
+ {
+   srand(static_cast<unsigned> (time(NULL)));
 
-//   DistTriangleVars preset_var;
-//   int num_failed = 0;
+   DistTriangleVars preset_var;
+   int num_failed = 0;
 
-//   for(int i = 0; i < STRESS_CHECK; i++)
-//   {
-//     Triangle s1, s2;
-//     generateRandomTriangle(&s1);
-//     generateRandomTriangle(&s2);
+   for(int i = 0; i < STRESS_CHECK; i++)
+   {
+     Triangle s1, s2;
+     generateRandomTriangle(&s1);
+     generateRandomTriangle(&s2);
 
-//     Eigen::Vector3f angles = Eigen::Vector3f::Random();
-//     Eigen::Vector3f pos = Eigen::Vector3f::Random();
+     Eigen::Vector3f angles = Eigen::Vector3f::Random();
+     Eigen::Vector3f pos = Eigen::Vector3f::Random();
 
-//     Eigen::AngleAxisf rollAngle(angles(0), Eigen::Vector3f::UnitZ());
-//     Eigen::AngleAxisf yawAngle(angles(1), Eigen::Vector3f::UnitY());
-//     Eigen::AngleAxisf pitchAngle(angles(2), Eigen::Vector3f::UnitX());
-//     Eigen::Quaternion<float> q = rollAngle * yawAngle * pitchAngle;
-//     Eigen::Matrix3f R = q.matrix();
+     Eigen::AngleAxisf rollAngle(angles(0), Eigen::Vector3f::UnitZ());
+     Eigen::AngleAxisf yawAngle(angles(1), Eigen::Vector3f::UnitY());
+     Eigen::AngleAxisf pitchAngle(angles(2), Eigen::Vector3f::UnitX());
+     Eigen::Quaternion<float> q = rollAngle * yawAngle * pitchAngle;
+     Eigen::Matrix3f R = q.matrix();
 
-//     float matR[3][3], translation[3];
-//     matR[0][0] = R(0,0); matR[0][1] = R(0,1); matR[0][2] = R(0,2);
-//     matR[1][0] = R(1,0); matR[1][1] = R(1,1); matR[1][2] = R(1,2);
-//     matR[2][0] = R(2,0); matR[2][1] = R(2,1); matR[2][2] = R(2,2);
+     float matR[3][3], translation[3];
+     matR[0][0] = R(0,0); matR[0][1] = R(0,1); matR[0][2] = R(0,2);
+     matR[1][0] = R(1,0); matR[1][1] = R(1,1); matR[1][2] = R(1,2);
+     matR[2][0] = R(2,0); matR[2][1] = R(2,1); matR[2][2] = R(2,2);
 
-//     translation[0] = pos(0);
-//     translation[1] = pos(1);
-//     translation[2] = pos(2);
+     translation[0] = pos(0);
+     translation[1] = pos(1);
+     translation[2] = pos(2);
 
-//     float correct = distTriangles_fcl(s1, s2, matR, translation);
-//     float actual = DIST_TRIANGLES(&s1, &s2, matR, translation, &preset_var);
+     float correct = distTriangles_fcl(s1, s2, matR, translation);
+     float actual = DIST_TRIANGLES(&s1, &s2, matR, translation, &preset_var);
 
-//     if(!approx_equal(actual, correct))
-//     {
-//       cout << "Difference is " << fabs(actual - correct) << endl;
-//       num_failed++;
-//     }
-//   }
+     if(!approx_equal(actual, correct))
+     {
+       cout << "Difference is " << fabs(actual - correct) << endl;
+       num_failed++;
+     }
+   }
 
-//   if(num_failed)
-//   {
-//     cout << num_failed << "/" << STRESS_CHECK << " failed! " << endl;
-//     assert(false);
-//   }
+   if(num_failed)
+   {
+     cout << num_failed << "/" << STRESS_CHECK << " failed! " << endl;
+     assert(false);
+   }
 
-//   cout << "TEST Triangles Stress random " << endl;
-// }
+   cout << "TEST Triangles Stress random " << endl;
+ }
 
 HOST_PREFIX std::ostream& operator<<(std::ostream& os, Triangle tri)
 {
