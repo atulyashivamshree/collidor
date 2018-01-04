@@ -30,8 +30,10 @@ void test_mesh_distance(string file1, string file2,
 
 template<typename BV, typename TraversalNode>
 void distance_Test_Oriented(const fcl::Transform3<typename BV::S>& tf,
-                            const std::vector<fcl::Vector3<typename BV::S>>& vertices1, const std::vector<Triangle>& triangles1,
-                            const std::vector<fcl::Vector3<typename BV::S>>& vertices2, const std::vector<Triangle>& triangles2, detail::SplitMethodType split_method,
+                            const std::vector<fcl::Vector3<typename BV::S>>& vertices1,
+							              const std::vector<Triangle>& triangles1,
+                            const std::vector<fcl::Vector3<typename BV::S>>& vertices2,
+							              const std::vector<Triangle>& triangles2, detail::SplitMethodType split_method,
                             int qsize,
                             fcl::test::DistanceRes<typename BV::S>& distance_result,
                             bool verbose);
@@ -141,8 +143,10 @@ void test_mesh_distance(string file1, string file2,
 
 template<typename BV, typename TraversalNode>
 void distance_Test_Oriented(const fcl::Transform3<typename BV::S>& tf,
-                            const std::vector<fcl::Vector3<typename BV::S>>& vertices1, const std::vector<Triangle>& triangles1,
-                            const std::vector<fcl::Vector3<typename BV::S>>& vertices2, const std::vector<Triangle>& triangles2, detail::SplitMethodType split_method,
+                            const std::vector<fcl::Vector3<typename BV::S>>& vertices1,
+							const std::vector<Triangle>& triangles1,
+                            const std::vector<fcl::Vector3<typename BV::S>>& vertices2,
+							const std::vector<Triangle>& triangles2, detail::SplitMethodType split_method,
                             int qsize,
                             fcl::test::DistanceRes<typename BV::S>& distance_result,
                             bool verbose)

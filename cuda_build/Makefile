@@ -13,20 +13,22 @@ LIB_DIRS = -L$(FCL_PATH)/build/lib
 
 all: dist_bvh
 
-test_block_puck: 
-	./dist_bvh.exe ../CAD/block.bvh ../CAD/puck.bvh block_puck
-	../build/verify_dist ../CAD/block.obj ../CAD/puck.obj block_puck.outp.csv
+test_block_puck:
+	./dist_bvh.exe ../CAD/block.bvh ../CAD/puck.bvh ../CAD/transforms_set2.csv block_puck
+	../build/verify_dist ../CAD/block.obj ../CAD/puck.obj ../CAD/transforms_set2.csv block_puck
+	rm block_puck_*.outp.csv
 
 test_s1_s2: 
-	./dist_bvh.exe ../CAD/sample1.bvh ../CAD/sample2.bvh s1s2
-	../build/verify_dist _ _ s1s2.outp.csv
+	./dist_bvh.exe ../CAD/sample1.bvh ../CAD/sample2.bvh ../CAD/transforms_set1.csv s1s2
+	../build/verify_dist _ _ ../CAD/transforms_set1.csv s1s2
+	rm s1s2_*.outp.csv
 	
 clean:
 	rm -I *.exe
+	rm -I *.outp.csv
 
 dist_bvh: $(SRC3) $(SRC4)
 	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) $(SRC3) -o dist_bvh.exe
-	./dist_bvh.exe ../CAD/sample1.bvh ../CAD/sample2.bvh s1s2
 
 test_triangles:
 	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) $(SRC1) -o test_triangles.exe

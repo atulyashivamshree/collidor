@@ -6,10 +6,12 @@
  */
 
 #include "BVH.h"
-#include <iostream>
-#include <iomanip>
 #include "Triangle-cuda-inl.h"
 #include "RSS-cuda-inl.h"
+#include "Eigen/Dense"
+#include <iostream>
+#include <iomanip>
+#include <algorithm>
 
 #ifndef BVH_CUDA_INL_H_
 #define BVH_CUDA_INL_H_
@@ -25,6 +27,7 @@
 
 using std::cout;
 using std::endl;
+using Transform3f = Eigen::Transform<float, 3, Eigen::AffineCompact>;
 
 struct Config
 {
@@ -391,7 +394,19 @@ void initializeResult(DistanceResult& result)
   result.stop = 0;
 }
 
-__host__ DistanceResult computeDistance(const BVH* bvh1, const BVH* bvh2, Config cfg,
+__host__ void updateConfigTransform(Config& cfg, const Transform3f tf)
+{
+  for(int i = 0; i < 3; i++)
+  {
+    for(int j = 0; j < 3; j++)
+      cfg.R[i][j] = tf.linear()(i,j);
+
+    cfg.t[i] = tf.translation()(i);
+  }
+}
+
+__host__ std::vector<DistanceResult> computeDistance(const BVH* bvh1, const BVH* bvh2, Config cfg,
+                                        std::vector<Transform3f>& transforms,
                                         std::string debg_queue_filename)
 {
   double t_init, t_copy1, t_run, t_copy2;
@@ -423,6 +438,7 @@ __host__ DistanceResult computeDistance(const BVH* bvh1, const BVH* bvh2, Config
   cudaMalloc(&d_cfg, sizeof(Config));
 
   //CREATE THE OUTPUT VARIABLE
+  std::vector<DistanceResult> results;
   DistanceResult h_res;
   initializeResult(h_res);
   DistanceResult* d_res;
@@ -444,9 +460,6 @@ __host__ DistanceResult computeDistance(const BVH* bvh1, const BVH* bvh2, Config
   cudaMemcpy(d_bvh1, &bvh1_cp, sizeof(BVH), cudaMemcpyHostToDevice);
   cudaMemcpy(d_bvh2, &bvh2_cp, sizeof(BVH), cudaMemcpyHostToDevice);
 
-  //COPY OVER CFG
-  cudaMemcpy(d_cfg, &cfg, sizeof(Config), cudaMemcpyHostToDevice);
-
   //COPY OVER QUEUES
   cudaMemcpy(d_bvq, &h_bvq, sizeof(Queue), cudaMemcpyHostToDevice);
   cudaMemcpy(d_leafq, &h_leafq, sizeof(Queue), cudaMemcpyHostToDevice);
@@ -457,47 +470,63 @@ __host__ DistanceResult computeDistance(const BVH* bvh1, const BVH* bvh2, Config
   //COPY OVER DEBUG VARS
   cudaMemcpy(d_dbg, h_dbg, cfg.dbg_size * sizeof(DebugVar), cudaMemcpyHostToDevice);
 
-  t_copy1 = get_wall_time();
+  for(int i = 0; i < transforms.size(); i++)
+  {
+    updateConfigTransform(cfg, transforms[i]); 
 
-  // MAIN CUDA EXECUTION GOES HERE
-  manager<<<1,1>>>(d_bvh1, d_bvh2, d_cfg, d_bvq, d_leafq, d_dbg, d_res);
+    //COPY OVER CFG
+    cudaMemcpy(d_cfg, &cfg, sizeof(Config), cudaMemcpyHostToDevice);
 
-  cudaDeviceSynchronize();
-  t_run = get_wall_time();
+    t_copy1 = get_wall_time();
 
-  // COPY BACK THE QUEUE 
-  cudaMemcpy(&h_bvq, d_bvq, sizeof(Queue), cudaMemcpyDeviceToHost);
-  cudaMemcpy(&h_leafq, d_leafq, sizeof(Queue), cudaMemcpyDeviceToHost);
+    // MAIN CUDA EXECUTION GOES HERE
+    manager<<<1,1>>>(d_bvh1, d_bvh2, d_cfg, d_bvq, d_leafq, d_dbg, d_res);
 
-  Task *h_bv_arr, *h_leaf_arr;
-  h_bv_arr = new Task[h_bvq.last];
-  h_leaf_arr = new Task[h_leafq.last];
-  cudaMemcpy(h_bv_arr, h_bvq.arr, h_bvq.last * sizeof(Task), cudaMemcpyDeviceToHost);
-  cudaMemcpy(h_leaf_arr, h_leafq.arr, h_leafq.last * sizeof(Task), cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
+    t_run = get_wall_time();
 
-  // COPY BACK DEBUG VARS
-  cudaMemcpy(h_dbg, d_dbg, cfg.dbg_size * sizeof(DebugVar), cudaMemcpyDeviceToHost);
-  // COPY BACK RESULTS
-  cudaMemcpy(&h_res, d_res, sizeof(DistanceResult), cudaMemcpyDeviceToHost);
+    // COPY BACK THE QUEUE 
+    cudaMemcpy(&h_bvq, d_bvq, sizeof(Queue), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&h_leafq, d_leafq, sizeof(Queue), cudaMemcpyDeviceToHost);
 
-  t_copy2 = get_wall_time();
+    Task *h_bv_arr, *h_leaf_arr;
+    h_bv_arr = new Task[h_bvq.last];
+    h_leaf_arr = new Task[h_leafq.last];
+    cudaMemcpy(h_bv_arr, h_bvq.arr, h_bvq.last * sizeof(Task), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_leaf_arr, h_leafq.arr, h_leafq.last * sizeof(Task), cudaMemcpyDeviceToHost);
 
-  printDebugInfo(h_dbg, cfg.dbg_size);
+    // COPY BACK DEBUG VARS
+    cudaMemcpy(h_dbg, d_dbg, cfg.dbg_size * sizeof(DebugVar), cudaMemcpyDeviceToHost);
+    // COPY BACK RESULTS
+    cudaMemcpy(&h_res, d_res, sizeof(DistanceResult), cudaMemcpyDeviceToHost);
 
-  cout << "======== STATS =========" << endl;
-  cout << "COPY1: " << t_copy1 - t_init << "ms" << endl;
-  cout << "RUN: " << t_run - t_copy1 << "ms" << endl;
-  cout << "COPY2: " << t_copy2 - t_run << "ms" << endl;
+    t_copy2 = get_wall_time();
 
-  // print out all the queue info that was gathered
-  std::ofstream of;
-  of << std::setprecision(7);
-  of.open(debg_queue_filename);
-  of << "NUM_BV: " << h_bvq.last << " NUM_LEAF: " << h_leafq.last << endl;
-  for(int i = 0;i < h_bvq.last; i++)
-    of << h_bv_arr[i].i1 << " " << h_bv_arr[i].i2 << " " << h_bv_arr[i].dist << endl;
-  for(int i = 0;i < h_leafq.last; i++)
-    of << h_leaf_arr[i].i1 << " " << h_leaf_arr[i].i2 << " " << h_leaf_arr[i].dist << endl;
+    results.push_back(h_res);
+    printDebugInfo(h_dbg, cfg.dbg_size);
+
+    cout << "======== STATS =========" << endl;
+    cout << "COPY1: " << t_copy1 - t_init << "ms" << endl;
+    cout << "RUN: " << t_run - t_copy1 << "ms" << endl;
+    cout << "COPY2: " << t_copy2 - t_run << "ms" << endl;
+
+    // print out all the queue info that was gathered
+    std::ofstream of;
+    of << std::setprecision(7);
+    std::string filename = debg_queue_filename + '_';
+    filename += ('0'+i);
+    filename += ".outp.csv";
+    of.open(filename.c_str());
+
+    of << "NUM_BV: " << h_bvq.last << " NUM_LEAF: " << h_leafq.last << endl;
+    for(int i = 0;i < h_bvq.last; i++)
+      of << h_bv_arr[i].i1 << " " << h_bv_arr[i].i2 << " " << h_bv_arr[i].dist << endl;
+    for(int i = 0;i < h_leafq.last; i++)
+      of << h_leaf_arr[i].i1 << " " << h_leaf_arr[i].i2 << " " << h_leaf_arr[i].dist << endl;
+
+    delete[] h_bv_arr;
+    delete[] h_leaf_arr;
+  }
   
   // FREE CUDA MEMORY
   cudaFree(bvh1_cp.bv_arr);
@@ -515,10 +544,7 @@ __host__ DistanceResult computeDistance(const BVH* bvh1, const BVH* bvh2, Config
   delete[] h_dbg;
   cudaFree(d_dbg);
 
-  delete[] h_bv_arr;
-  delete[] h_leaf_arr;
-
-  return h_res;
+  return results;
 }
 
 #endif /* BVH_CUDA_INL_H_ */
