@@ -5,7 +5,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wfatal-errors -Wformat=5")
 enable_testing()
 
 include_directories("/usr/include/eigen3")
-set(FCL_PATH "/home/atulya/Documents/eecs587/fcl")
+set(FCL_PATH "/home/atulya/eecs587/fcl")
 find_package( octomap REQUIRED)
 #link_directories("/usr/local/lib")
 

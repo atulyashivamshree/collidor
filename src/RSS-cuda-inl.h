@@ -28,7 +28,7 @@ __device__ void computeDistance(const RSS *r1, const RSS* d2,
   loc_d2 = *d2;
   // res->dist = 1e-6 + distRSSs(r1, d2, &vars);
   float dist = rssDistance(loc_R, loc_t, &loc_r1, &loc_d2, &vars);
-  res->id = dist;
+  res->dist = dist;
 
 }
 

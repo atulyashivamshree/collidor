@@ -13,8 +13,14 @@ LIB_DIRS = -L$(FCL_PATH)/build/lib
 
 all: dist_bvh
 
-test: test_triangles test_rss
+test_block_puck: 
+	./dist_bvh.exe ../CAD/block.bvh ../CAD/puck.bvh block_puck
+	../build/verify_dist ../CAD/block.obj ../CAD/puck.obj block_puck.outp.csv
 
+test_s1_s2: 
+	./dist_bvh.exe ../CAD/sample1.bvh ../CAD/sample2.bvh s1s2
+	../build/verify_dist _ _ s1s2.outp.csv
+	
 clean:
 	rm -I *.exe
 

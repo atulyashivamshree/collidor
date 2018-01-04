@@ -50,6 +50,9 @@ struct DistanceResult
   unsigned int idy;
 };
 
+// REQUIRES : A valid queue
+// MODIFIES : The queue structure
+// EFFECTS  : initializes the start and last elements of the queue
 __device__ __inline__ void initializeQueue(Queue *q)
 {
   q->start = 0;
@@ -58,7 +61,12 @@ __device__ __inline__ void initializeQueue(Queue *q)
   q->max_capacity = MAX_QUEUE_CAPACITY;
 }
 
-__device__ __inline__ void addToQueue(Queue* bvq, int id1, int id2)
+// REQUIRES : A valid queue
+//            ids of two elements
+// MODIFIES : The queue structure
+// EFFECTS  : adds a pair of ids to the queue and initializes its distance to
+//            inf
+__device__ __inline__ void addToQueue(Queue* bvq, const int id1, const int id2)
 {
   bvq->arr[bvq->last].i1 = id1;
   bvq->arr[bvq->last].i2 = id2;
@@ -67,33 +75,56 @@ __device__ __inline__ void addToQueue(Queue* bvq, int id1, int id2)
   bvq->size = bvq->size + 1;
 }
 
-__device__ __inline__ int getIdFromQueue(Queue* bvq, int index) {
+// REQUIRES : A valid queue
+//            0 <= index < queue size
+// MODIFIES : 
+// EFFECTS  : gives the actual index of the particular element inside the queue
+//            array
+__device__ __inline__ int getIdFromQueue(const Queue* bvq, const int index) {
   return (index + bvq->start)%(bvq->max_capacity);
 }
 
-__device__ __inline__ void removeNFromQueue(Queue* bvq, int N) {
+// REQUIRES : A valid queue
+//            0 <= N < queue size
+// MODIFIES : the queue data structure
+// EFFECTS  : removes N elements from the queue by shifting the starting index 
+//            of the queue inside the 1D array
+__device__ __inline__ void removeNFromQueue(Queue* bvq, const int N) {
   bvq->start = (bvq->start + N)%(bvq->max_capacity);
   bvq->size = bvq->size - N;
 }
 
-__device__ __inline__ int getSize(Queue* bvq) {
+// EFFECTS  : returns the total number of elements inside the queue
+__device__ __inline__ int getSize(const Queue* bvq) {
   return bvq->size;
 }
 
-__device__ __inline__ int isFull(Queue* bvq) {
+// EFFECTS  : returns if the queue is full or not
+__device__ __inline__ int isFull(const Queue* bvq) {
   if(bvq->size >= bvq->max_capacity)
     return 1;
   return 0;
 }
 
-// reduces num tasks from the leaf queue
+// REQUIRES : Two bounding volume heirarchy bvhA, bvhB
+//            Config for the computation
+//            Queue of leaf elements
+//            DistanceResult to update results
+//            num : the number of leaf tasks that have been updated
+// MODIFIES : leaf queue
+//            Distance result
+// EFFECTS  : given some tasks in the leaf queue it evaluates them to compute
+//            the minima and updates the global values appropriately
+//            num elements from leaf queue are extracted
+//            The result values are updated
+//            TODO : parallelize this over multiple threads
 __device__ void reduceLeafTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
                           Queue *l_q, DistanceResult* res,
-                          int num)
+                          const int num)
 {
   float d_min = res->dist;
 
-  // first check the leaf checks to search for mpotential minimas
+  // first check the leaf checks to search for potential minimas
   for(int i = 0; i < num; i++)
   {
     int arr_id = getIdFromQueue(l_q, 0);
@@ -103,16 +134,29 @@ __device__ void reduceLeafTasks(const BVH* bvhA, const BVH* bvhB, const Config* 
   res->dist = d_min;
 }
 
-
-// add some tasks off from the existing list of tasks
+// REQUIRES : Two bounding volume heirarchy bvhA, bvhB
+//            Config for the computation
+//            Queue of BV elements
+//            DistanceResult to update results
+//            num : the number of leaf tasks that have been updated
+// MODIFIES : BV queue
+//            Stopping conditions inside DistResult
+// EFFECTS  : given some tasks in the BV queue it evaluates them to check if 
+//            they add further new tasks or can be safely discarded for future
+//            New tasks are either add to BV queue or Leaf queue 
+//            (TODO : think of possible race conditions)
+//            num elements inside the BV queue are extracted
+//            Stopping conditions inside DistResult
+//            TODO : parallelize this over multiple threads
 __device__ void addBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
                           Queue* bv_q, Queue *l_q, DistanceResult* res,
-                          int num)
+                          const int num)
 {
   BV bvA;
   BV bvB;
   float d_min = res->dist;
 
+  // Evaluate BV only if stopping condition has not been met
   if(d_min > cfg->gamma)
   {
     // next split and add tasks if necessary
@@ -125,6 +169,7 @@ __device__ void addBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
       new_t1.i2 = bv_q->arr[arr_id].i2;
       new_t2 = new_t1;
 
+      // task would be added only if the distance between BVs is less than d_min
       if(bv_q->arr[arr_id].dist <= d_min)
       {
         bvA = bvhA->bv_arr[bv_q->arr[arr_id].i1];
@@ -186,13 +231,17 @@ __device__ void addBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   {
     res->stop = STOP_CONDITION_BELOW_THRESH;
   }
-
-  // updating the results
-  res->dist = d_min;
 }
 
+// REQUIRES : Two bounding volume heirarchy bvhA, bvhB
+//            Config for the computation
+//            Queue of BV elements
+//            num : the number of leaf tasks that have been updated
+// MODIFIES : BV queue (distance values for each task)
+// EFFECTS  : Extract num BVs from the BV queue and evaluates them for pairwise 
+//            distance
 __global__ void processBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
-                             Queue* bv_q, int num)
+                             Queue* bv_q, const int num)
 {
   int j = blockIdx.y * blockDim.y + threadIdx.y;
   int arr_id = getIdFromQueue(bv_q, j);
@@ -206,12 +255,19 @@ __global__ void processBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* c
     RSSResult res;
     computeDistance(&bvA.rss, &bvB.rss, cfg->R, cfg->t, &res);
 
-    bv_q->arr[arr_id].dist = res.id;
+    bv_q->arr[arr_id].dist = res.dist;
   }
 }
 
+// REQUIRES : Two bounding volume heirarchy bvhA, bvhB
+//            Config for the computation
+//            Queue of Leaf elements
+//            num : the number of leaf tasks that have been updated
+// MODIFIES : Leaf queue (distance values for each task)
+// EFFECTS  : Extract num triangles from Leaf queue and evaluate them for 
+//            pairwise distance
 __global__ void processLeafTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
-                             Queue* leaf_q, int num)
+                             Queue* leaf_q, const int num)
 {
   int j = blockIdx.y * blockDim.y + threadIdx.y;
 
