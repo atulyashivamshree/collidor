@@ -36,7 +36,7 @@ __host__ int main(int argc, char *argv[])
   vector<Transform3f> transforms;
   loadTransformations(transforms, argv[3]);
 
-  Config def_cfg({0.04, 15, {1,0,0, 0,1,0, 0,0,1}, {0,0,0}, 0});
+  Config def_cfg({0.04, 15, {1,0,0, 0,1,0, 0,0,1}, {0,0,0}, 1});
   vector<DistanceResult> results = computeDistance(&bvh1, &bvh2, def_cfg, 
                               transforms,
                               string(argv[4]));

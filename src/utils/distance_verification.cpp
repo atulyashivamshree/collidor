@@ -123,6 +123,7 @@ void verifyDistances(string file1, string file2, string transforms_file, string 
 		cout << setprecision(7);
 
 		// LOAD and evaulate each one of the bounding volumes
+		cout << "========= Bounding Volumes =========" << endl;
 		int num_bv, num_tri;
 		string str;
 		if3 >> str >> num_bv >> str >> num_tri;
@@ -137,6 +138,7 @@ void verifyDistances(string file1, string file2, string transforms_file, string 
 
 		}
 
+		cout << "============ Triangles ============" << endl;
 		// LOAD and evaluate each of the triangles
 		for(int i = 0;i < num_tri; i++)
 		{

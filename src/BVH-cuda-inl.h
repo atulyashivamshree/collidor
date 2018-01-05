@@ -320,7 +320,8 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
     dimGridBV.y = (num_bv_tasks - 1)/BLOCKSIZE_BV + 1;
     if(num_bv_tasks)
     {
-      processBVTasks<<<dimGridBV, dimBlockBV>>>(bvhA, bvhB, cfg, bv_queue, num_bv_tasks);
+      processBVTasks<<<dimGridBV, dimBlockBV>>>(bvhA, bvhB, cfg, bv_queue, 
+                                        num_bv_tasks);
     }
     cudaDeviceSynchronize();
 

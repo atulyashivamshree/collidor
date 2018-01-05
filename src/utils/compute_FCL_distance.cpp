@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
 
 	validateDistances(argv[4], distances);
 
-	cout << "Time taken: " << elap_time << endl;
+	cout << "CPU Time taken: " << elap_time << endl;
 }
 
 void validateDistances(string gpu_outfile, vector<float> distances)
@@ -202,8 +202,8 @@ void distance_Test_Oriented(const fcl::Transform3<typename BV::S>& tf,
 
   fcl::DistanceResult<S> local_result;
   TraversalNode node;
-  if(!initialize(node, (const fcl::BVHModel<BV>&)m1, tf,
-		  (const fcl::BVHModel<BV>&)m2, fcl::Transform3<S>::Identity(),
+  if(!initialize(node, (const fcl::BVHModel<BV>&)m1, fcl::Transform3f::Identity(),
+		  (const fcl::BVHModel<BV>&)m2, tf,
 		  fcl::DistanceRequest<S>(true), local_result))
     std::cout << "initialize error" << std::endl;
 
