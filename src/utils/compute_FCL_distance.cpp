@@ -12,6 +12,9 @@
 #include <vector>
 #include <iomanip>
 
+#include <time.h>
+#include <sys/time.h>
+
 #include "Eigen/Dense"
 #include "fcl/geometry/bvh/detail/BVH_front.h"
 #include "fcl/narrowphase/detail/traversal/collision_node.h"
@@ -26,7 +29,7 @@ template <typename S>
 void test_mesh_distance(string file1, string file2,
 		vector<Transform3<S>> transforms,
 		vector<S>& distance,
-		float& elap_time);
+		vector<float>& elap_time);
 
 template<typename BV, typename TraversalNode>
 void distance_Test_Oriented(const fcl::Transform3<typename BV::S>& tf,
@@ -36,14 +39,17 @@ void distance_Test_Oriented(const fcl::Transform3<typename BV::S>& tf,
 							const std::vector<Triangle>& triangles2, detail::SplitMethodType split_method,
                             int qsize,
                             fcl::test::DistanceRes<typename BV::S>& distance_result,
-							float& elap_time,
+							vector<float>& elap_time,
                             bool verbose);
 
 bool approxEquals(float a, float b, float EPSILON = 1e-4) {
 	return (fabs(a - b) < EPSILON);
 }
 
-void validateDistances(string gpu_outfile, vector<float> distances);
+double get_wall_time();
+
+void validateDistances(string gpu_outfile, vector<float> distances,
+                                          vector<float> cpu_time);
 
 void help_message();
 
@@ -53,7 +59,7 @@ int main(int argc, char *argv[])
 {
 	vector<Transform3f> transforms;
 	vector<float> distances;
-	float elap_time;
+	vector<float> elap_time;
 
 	if(argc != 5)
 	{
@@ -64,12 +70,11 @@ int main(int argc, char *argv[])
 	loadTransformations(transforms, argv[3]);
 	test_mesh_distance(argv[1], argv[2], transforms, distances, elap_time);
 
-	validateDistances(argv[4], distances);
-
-	cout << "CPU Time taken: " << elap_time << endl;
+	validateDistances(argv[4], distances, elap_time);
 }
 
-void validateDistances(string gpu_outfile, vector<float> distances)
+void validateDistances(string gpu_outfile, vector<float> distances, 
+                                            vector<float> cpu_time)
 {
 	cout << std::setprecision(7);
 	ifstream fin;
@@ -81,12 +86,20 @@ void validateDistances(string gpu_outfile, vector<float> distances)
 	}
 	int count_inequality = 0;
 
+  float tot_cpu_time = 0;
+  float tot_gpu_time = 0;
+
 	for(int i = 0; i < distances.size(); i++)
 	{
 		string tmp_id;
-		float dist;
-		fin >> tmp_id >> dist;
-		cout << "[" << i << "]" << "EXP: " << distances[i] << ", ACTUAL: " << dist << endl;
+		float dist, del_t;
+		fin >> tmp_id >> dist >> del_t;
+		cout << "[" << i << "]" << "EXP: " << distances[i] << ", ACTUAL: " << dist 
+            << ", cpu dt: " << cpu_time[i] << "s"
+            << ", gpu dt: " << del_t << "s" << endl;
+
+    tot_gpu_time += del_t;
+    tot_cpu_time += cpu_time[i];
 
 		if(!approxEquals(distances[i], dist))
 			count_inequality++;
@@ -96,6 +109,9 @@ void validateDistances(string gpu_outfile, vector<float> distances)
 		cout << "Object Distance test : PASSED " << endl;
 	else
 		cout << "Object Distance test : FAILED " << endl;
+
+  cout << "Total CPU time : " << tot_cpu_time << endl;
+  cout << "Total GPU time : " << tot_gpu_time << endl;
 
 	fin.close();
 }
@@ -145,7 +161,7 @@ template <typename S>
 void test_mesh_distance(string file1, string file2,
 		vector<Transform3<S>> transforms,
 		vector<S>& distance,
-		float& elap_time)
+		vector<float>& elap_time)
 {
 	//LOAD the two OBJ files or the default versions of the files
 	std::vector<fcl::Vector3<S>> p1, p2;
@@ -160,8 +176,6 @@ void test_mesh_distance(string file1, string file2,
 	  createSampleObj2(p2, t2);
 	else
 	  fcl::test::loadOBJFile(file2.c_str(), p2, t2);
-
-	elap_time = 0;
 
 	//RUN the distance computation tests on all the different transforms for the two objects
 	test::DistanceRes<S> res, res_now;
@@ -181,7 +195,7 @@ void distance_Test_Oriented(const fcl::Transform3<typename BV::S>& tf,
 							const std::vector<Triangle>& triangles2, detail::SplitMethodType split_method,
                             int qsize,
                             fcl::test::DistanceRes<typename BV::S>& distance_result,
-							float& elap_time,
+							vector<float>& elap_time,
                             bool verbose)
 {
   using S = typename BV::S;
@@ -210,14 +224,12 @@ void distance_Test_Oriented(const fcl::Transform3<typename BV::S>& tf,
   node.enable_statistics = verbose;
 
   // START timer to measure the distance computation time
-  test::Timer timer_dist;
-  timer_dist.start();
+  double t_start = get_wall_time();
 
   distance(&node, nullptr, qsize);
 
-  //STOP timer
-  timer_dist.stop();
-  elap_time += timer_dist.getElapsedTimeInSec();
+  // STOP timer
+  elap_time.push_back(get_wall_time() - t_start);
 
   // points are in local coordinate, to global coordinate
   Vector3<S> p1 = local_result.nearest_points[0];
@@ -237,4 +249,11 @@ void distance_Test_Oriented(const fcl::Transform3<typename BV::S>& tf,
   }
 }
 
-
+double get_wall_time(){
+    struct timeval time;
+    if (gettimeofday(&time,NULL)){
+        //  Handle error
+        return 0;
+    }
+    return (double)time.tv_sec + (double)time.tv_usec * .000001;
+}

@@ -14,9 +14,9 @@ LIB_DIRS = -L$(FCL_PATH)/build/lib
 all: dist_bvh
 
 test:
-	./dist_bvh.exe ../CAD/sample1.bvh ../CAD/sample2.bvh ../CAD/transforms_set0.csv s1s2
-	rm s1s2_*.outp.csv
-	../build/compute_dist_bvh _ _ ../CAD/transforms_set0.csv ../cuda_build/s1s2.out
+	./dist_bvh.exe ../CAD/block.bvh ../CAD/puck.bvh ../CAD/transforms_set0.csv block_puck
+	rm block_puck_*.outp.csv
+	../build/compute_dist_bvh ../CAD/block.obj ../CAD/puck.obj ../CAD/transforms_set0.csv ../cuda_build/block_puck.out
 
 test_block_puck:
 	./dist_bvh.exe ../CAD/block.bvh ../CAD/puck.bvh ../CAD/transforms_set2.csv block_puck

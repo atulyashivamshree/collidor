@@ -13,6 +13,8 @@
 #include <iomanip>
 #include <algorithm>
 
+#include <unistd.h>
+
 #ifndef BVH_CUDA_INL_H_
 #define BVH_CUDA_INL_H_
 
@@ -406,9 +408,21 @@ __host__ void updateConfigTransform(Config& cfg, const Transform3f tf)
   }
 }
 
+__host__ void printConfig(const Config cfg)
+{
+  cout << "CONFIG : " << endl;
+  cout << "gamma: " << cfg.gamma << ", dbg_size:" << cfg.dbg_size << endl;
+  cout << "R: [" << cfg.R[0][0] << ", " << cfg.R[0][1] << ", " << cfg.R[0][2] <<
+    "\n" << cfg.R[1][0] << ", " << cfg.R[1][1] << ", " << cfg.R[1][2] << 
+    "\n" << cfg.R[2][0] << ", " << cfg.R[2][1] << ", " << cfg.R[2][2] << endl;
+  cout << "T: [" << cfg.t[0] << ", " << cfg.t[1] << ", " << cfg.t[2] << endl;
+  cout << "reduceLeafTasks: " << cfg.enable_distance_reduction << endl;
+}
+
 __host__ std::vector<DistanceResult> computeDistance(const BVH* bvh1, const BVH* bvh2, Config cfg,
-                                        std::vector<Transform3f>& transforms,
-                                        std::string debg_queue_filename)
+                                        const std::vector<Transform3f> transforms,
+                                        const std::string debg_queue_filename,
+                                        std::vector<float>& elap_time)
 {
   double t_init, t_copy1, t_run, t_copy2;
 
@@ -465,15 +479,19 @@ __host__ std::vector<DistanceResult> computeDistance(const BVH* bvh1, const BVH*
   cudaMemcpy(d_bvq, &h_bvq, sizeof(Queue), cudaMemcpyHostToDevice);
   cudaMemcpy(d_leafq, &h_leafq, sizeof(Queue), cudaMemcpyHostToDevice);
 
-  //COPY OVER OUTPUT VARS
-  cudaMemcpy(d_res, &h_res, sizeof(DistanceResult), cudaMemcpyHostToDevice);
-
   //COPY OVER DEBUG VARS
   cudaMemcpy(d_dbg, h_dbg, cfg.dbg_size * sizeof(DebugVar), cudaMemcpyHostToDevice);
 
   for(int i = 0; i < transforms.size(); i++)
   {
+    // update the result values and config for next iteration
+    initializeResult(h_res);
+
     updateConfigTransform(cfg, transforms[i]); 
+    printConfig(cfg);
+
+    //COPY OVER OUTPUT VARS
+    cudaMemcpy(d_res, &h_res, sizeof(DistanceResult), cudaMemcpyHostToDevice);
 
     //COPY OVER CFG
     cudaMemcpy(d_cfg, &cfg, sizeof(Config), cudaMemcpyHostToDevice);
@@ -504,12 +522,14 @@ __host__ std::vector<DistanceResult> computeDistance(const BVH* bvh1, const BVH*
     t_copy2 = get_wall_time();
 
     results.push_back(h_res);
+    elap_time.push_back(t_run - t_copy1);
+
     printDebugInfo(h_dbg, cfg.dbg_size);
 
     cout << "======== STATS =========" << endl;
-    cout << "COPY1: " << t_copy1 - t_init << "ms" << endl;
-    cout << "RUN: " << t_run - t_copy1 << "ms" << endl;
-    cout << "COPY2: " << t_copy2 - t_run << "ms" << endl;
+    cout << "COPY1: " << t_copy1 - t_init << "s" << endl;
+    cout << "RUN: " << t_run - t_copy1 << "s" << endl;
+    cout << "COPY2: " << t_copy2 - t_run << "s" << endl;
 
     // print out all the queue info that was gathered
     std::ofstream of;

@@ -15,7 +15,7 @@ using namespace std;
 
 __host__ void help_message();
 __host__ void loadData(string file1, string file2, BVH& bvh1, BVH& bvh2);
-__host__ void printResult(ostream& os, const vector<DistanceResult> res);
+__host__ void printResult(ostream& os, const vector<DistanceResult> res, const vector<float> elap_time);
 __host__ void loadTransformations(vector<Transform3f>& transforms, const string filename);
 
 __host__ int main(int argc, char *argv[])
@@ -37,15 +37,17 @@ __host__ int main(int argc, char *argv[])
   loadTransformations(transforms, argv[3]);
 
   Config def_cfg({0.04, 15, {1,0,0, 0,1,0, 0,0,1}, {0,0,0}, 1});
+  vector<float> elap_time;
   vector<DistanceResult> results = computeDistance(&bvh1, &bvh2, def_cfg, 
                               transforms,
-                              string(argv[4]));
+                              string(argv[4]),
+                              elap_time);
 
   ofstream fout;
   string outfile = argv[4];
   outfile += ".out";
   fout.open(outfile.c_str());
-  printResult(fout, results);
+  printResult(fout, results, elap_time);
   fout.close();
 
   for(const auto res : results)
@@ -68,10 +70,11 @@ __host__ void help_message() {
   cout << " QUEUE_OUTP_PREFIX: output file for the queues" << endl;
 }
 
-__host__ void printResult(ostream& os, const vector<DistanceResult> results)
+__host__ void printResult(ostream& os, const vector<DistanceResult> results, 
+                          const vector<float> elap_time)
 {
   for(int i = 0; i < results.size(); i++)
-    os << "[" << i << "] " << results[i].dist << endl;
+    os << "[" << i << "] " << results[i].dist << " " << elap_time[i] << endl;
 }
 
 __host__ void loadTransformations(vector<Transform3f>& transforms, const string filename)
