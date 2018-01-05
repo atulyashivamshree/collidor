@@ -31,24 +31,17 @@ using std::cout;
 using std::endl;
 using Transform3f = Eigen::Transform<float, 3, Eigen::AffineCompact>;
 
-struct Config
-{
-  float gamma;
-  int dbg_size;
-  float R[3][3];
-  float t[3];
-  int enable_distance_reduction;  // set it to 0 to print get distance on all possible leaf elements without early termination
-};
 struct DebugVar
 {
-  Task tsk;
-  uint idx;
-  uint idy;
+  int total_bv;
+  int proc_bv;
+  int num_tri;
 };
 struct DistanceResult
 {
   float dist;
   int stop;
+  int num_iter;
   Task tsk;
   Task tsk2;
   unsigned int idx;
@@ -306,16 +299,13 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   dim3 dimBlockLeaf(1, BLOCKSIZE_LEAF);
   dim3 dimGridLeaf(1,1);
 
-  // for(int i = 0; i < cfg->dbg_size; i++)
-  // {
-  //   dbg_var[i].idy = i;
-  //   dbg_var[i].tsk.dist = i * 3.0;
-  // 4
-
-  for(int i = 0;i < 50; i++)
+  int i;
+  for(i = 0;i < cfg->max_iter && (res.stop == 0); i++)
   {
     // PROCESS THE BV TREE NODE TASKS
     int num_bv_tasks = getSize(bv_queue);
+    dbg_var[i].total_bv = num_bv_tasks;
+
     if(num_bv_tasks > MAX_BV_TASKS)
       num_bv_tasks = MAX_BV_TASKS;
     
@@ -355,8 +345,8 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
     if(num_bv_tasks == 0 && num_leaf_tasks == 0)
       res.stop = STOP_CONDITION_COMPLETED;
 
-    dbg_var[i].idx = num_bv_tasks;
-    dbg_var[i].idy = num_leaf_tasks;
+    dbg_var[i].proc_bv = num_bv_tasks;
+    dbg_var[i].num_tri = num_leaf_tasks;
 
   }
 
@@ -366,28 +356,22 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   RSSResult rss_res;
   computeDistance(&bvA.rss, &bvB.rss,cfg->R, cfg->t, &rss_res);
 
-  for(int i = 0; i < 10; i++)
-    dbg_var[i].tsk = bv_queue->arr[i];
-  for(int i = 0; i < 5; i++)
-    dbg_var[i + 10].tsk = l_queue->arr[i];
-
   *result = res;
   result->tsk.dist = rss_res.dist;
   result->idx = bv_queue->size;
   result->idy = l_queue->size;
+  result->num_iter = i;
   // result->dist = bv_queue->arr[0].i1;
 }
 
 __host__ void printDebugInfo(DebugVar* arr, int size)
 {
   cout << std::setprecision(4);
+  cout << "ITER, TOTAL_BV, NUM_BV_PROC, NUM_TRI " << endl;
   for(int i = 0; i < size; i++)
   {
-    cout << "Task: " << arr[i].tsk.i1 << " " << arr[i].tsk.i2 
-                    << " " << arr[i].tsk.dist << " ";
-    cout << "idx: " << arr[i].idx << " " ;
-    cout << "idy: " << arr[i].idy;
-    cout << endl;
+    cout << " [" << i << "] : " << arr[i].total_bv << ", " << arr[i].proc_bv
+            << ", " << arr[i].num_tri << endl;
   }
 }
 
@@ -395,6 +379,7 @@ void initializeResult(DistanceResult& result)
 {
   result.dist = 1.0e38;
   result.stop = 0;
+  result.num_iter = 0;
 }
 
 __host__ void updateConfigTransform(Config& cfg, const Transform3f tf)
@@ -411,12 +396,18 @@ __host__ void updateConfigTransform(Config& cfg, const Transform3f tf)
 __host__ void printConfig(const Config cfg)
 {
   cout << "CONFIG : " << endl;
-  cout << "gamma: " << cfg.gamma << ", dbg_size:" << cfg.dbg_size << endl;
+  cout << "gamma: " << cfg.gamma << ", max_iter:" << cfg.max_iter << endl;
   cout << "R: [" << cfg.R[0][0] << ", " << cfg.R[0][1] << ", " << cfg.R[0][2] <<
     "\n" << cfg.R[1][0] << ", " << cfg.R[1][1] << ", " << cfg.R[1][2] << 
     "\n" << cfg.R[2][0] << ", " << cfg.R[2][1] << ", " << cfg.R[2][2] << endl;
   cout << "T: [" << cfg.t[0] << ", " << cfg.t[1] << ", " << cfg.t[2] << endl;
   cout << "reduceLeafTasks: " << cfg.enable_distance_reduction << endl;
+}
+
+__host__ void initializeDbg(DebugVar* arr, int size)
+{
+  for(int i = 0; i< size; i++)
+    arr[i] = DebugVar({0, 0, 0});
 }
 
 __host__ std::vector<DistanceResult> computeDistance(const BVH* bvh1, const BVH* bvh2, Config cfg,
@@ -460,11 +451,10 @@ __host__ std::vector<DistanceResult> computeDistance(const BVH* bvh1, const BVH*
   cudaMalloc(&d_res, sizeof(DistanceResult));
 
   //CREATE THE DEBUGGING VARIABLE
-  DebugVar *h_dbg = new DebugVar[cfg.dbg_size];
-  for(int i = 0; i< cfg.dbg_size; i++)
-    h_dbg[i] = DebugVar({{0,0,-1}, 0, 0});
+  DebugVar *h_dbg = new DebugVar[cfg.max_iter];
+  initializeDbg(h_dbg, cfg.max_iter);
   DebugVar *d_dbg;
-  cudaMalloc(&d_dbg, cfg.dbg_size * sizeof(DebugVar));
+  cudaMalloc(&d_dbg, cfg.max_iter * sizeof(DebugVar));
 
   t_init = get_wall_time();
   //COPY OVER BVH
@@ -479,16 +469,17 @@ __host__ std::vector<DistanceResult> computeDistance(const BVH* bvh1, const BVH*
   cudaMemcpy(d_bvq, &h_bvq, sizeof(Queue), cudaMemcpyHostToDevice);
   cudaMemcpy(d_leafq, &h_leafq, sizeof(Queue), cudaMemcpyHostToDevice);
 
-  //COPY OVER DEBUG VARS
-  cudaMemcpy(d_dbg, h_dbg, cfg.dbg_size * sizeof(DebugVar), cudaMemcpyHostToDevice);
-
   for(int i = 0; i < transforms.size(); i++)
   {
     // update the result values and config for next iteration
+    initializeDbg(h_dbg, cfg.max_iter);
     initializeResult(h_res);
 
     updateConfigTransform(cfg, transforms[i]); 
     printConfig(cfg);
+
+    //COPY OVER DEBUG VARS
+    cudaMemcpy(d_dbg, h_dbg, cfg.max_iter * sizeof(DebugVar), cudaMemcpyHostToDevice);
 
     //COPY OVER OUTPUT VARS
     cudaMemcpy(d_res, &h_res, sizeof(DistanceResult), cudaMemcpyHostToDevice);
@@ -515,7 +506,7 @@ __host__ std::vector<DistanceResult> computeDistance(const BVH* bvh1, const BVH*
     cudaMemcpy(h_leaf_arr, h_leafq.arr, h_leafq.last * sizeof(Task), cudaMemcpyDeviceToHost);
 
     // COPY BACK DEBUG VARS
-    cudaMemcpy(h_dbg, d_dbg, cfg.dbg_size * sizeof(DebugVar), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_dbg, d_dbg, cfg.max_iter * sizeof(DebugVar), cudaMemcpyDeviceToHost);
     // COPY BACK RESULTS
     cudaMemcpy(&h_res, d_res, sizeof(DistanceResult), cudaMemcpyDeviceToHost);
 
@@ -524,7 +515,7 @@ __host__ std::vector<DistanceResult> computeDistance(const BVH* bvh1, const BVH*
     results.push_back(h_res);
     elap_time.push_back(t_run - t_copy1);
 
-    printDebugInfo(h_dbg, cfg.dbg_size);
+    printDebugInfo(h_dbg, h_res.num_iter);
 
     cout << "======== STATS =========" << endl;
     cout << "COPY1: " << t_copy1 - t_init << "s" << endl;

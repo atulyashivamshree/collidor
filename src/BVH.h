@@ -46,6 +46,16 @@ struct Queue
   unsigned int max_capacity;
 };
 
+struct Config
+{
+  float gamma;
+  int max_iter;
+  float R[3][3];
+  float t[3];
+  int enable_distance_reduction;  // set it to 0 to print get distance on all possible leaf elements without early termination
+  int max_bv_proc;
+};
+
 // probably move them to BVH-cuda.cu
 void initializeBV(BV * bv);
 

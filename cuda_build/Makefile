@@ -14,28 +14,28 @@ LIB_DIRS = -L$(FCL_PATH)/build/lib
 all: dist_bvh
 
 test:
-	./dist_bvh.exe ../CAD/block.bvh ../CAD/puck.bvh ../CAD/transforms_set0.csv block_puck
+	./dist_bvh.exe ../params/puck_puck_t0.yaml
 	rm block_puck_*.outp.csv
-	../build/compute_dist_bvh ../CAD/block.obj ../CAD/puck.obj ../CAD/transforms_set0.csv ../cuda_build/block_puck.out
+	../build/compute_dist_bvh ../params/puck_puck_t0.yaml
 
 test_block_puck:
-	./dist_bvh.exe ../CAD/block.bvh ../CAD/puck.bvh ../CAD/transforms_set2.csv block_puck
+	./dist_bvh.exe ../params/block_puck.yaml
 	rm block_puck_*.outp.csv
-	../build/compute_dist_bvh ../CAD/block.obj ../CAD/puck.obj ../CAD/transforms_set2.csv ../cuda_build/block_puck.out
+	../build/compute_dist_bvh ../params/block_puck.yaml
 
 test_s1_s2:
-	./dist_bvh.exe ../CAD/sample1.bvh ../CAD/sample2.bvh ../CAD/transforms_set1.csv s1s2
+	./dist_bvh.exe ../params/s1s2.yaml
 	rm s1s2_*.outp.csv
-	../build/compute_dist_bvh _ _ ../CAD/transforms_set1.csv ../cuda_build/s1s2.out
+	../build/compute_dist_bvh ../params/s1s2.yaml
 
 test_block_puck_queue:
-	./dist_bvh.exe ../CAD/block.bvh ../CAD/puck.bvh ../CAD/transforms_set0.csv block_puck
-	../build/verify_dist ../CAD/block.obj ../CAD/puck.obj ../CAD/transforms_set0.csv block_puck
+	./dist_bvh.exe ../params/block_puck.yaml
+	../build/verify_dist ../params/block_puck.yaml
 	rm block_puck_*.outp.csv
 
 test_s1_s2_queue:
-	./dist_bvh.exe ../CAD/sample1.bvh ../CAD/sample2.bvh ../CAD/transforms_set1.csv s1s2
-	../build/verify_dist _ _ ../CAD/transforms_set1.csv s1s2
+	./dist_bvh.exe ../params/s1s2.yaml
+	../build/verify_dist ../params/s1s2.yaml
 	rm s1s2_*.outp.csv
 	
 clean:

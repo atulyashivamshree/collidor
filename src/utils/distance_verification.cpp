@@ -25,24 +25,14 @@ using namespace std;
 using namespace fcl;
 
 #include "SampleObjects.h"
-
+#include "parse_utils.h"
 
 // takes in a BVH of FCL and converts to BVH of this project
-void verifyDistances(string file1, string file2, string transforms_file, string node_distances_file);
-
-void loadTransformations(vector<Transform3f>& transforms, const string filename);
-
-bool approxEquals(float a, float b, float EPSILON = 1e-4) {
-	return (fabs(a - b) < EPSILON);
-}
+void verifyDistances(string file1, string file2, string transforms_file, string outp_prefix);
 
 void help_message() {
-	cout << "Usage : ./verify_distances.exe FILE1.obj FILE2.obj FOUT_DIST.outp.csv" << endl;
-	cout << " FILE1: input .obj file " << endl;
-	cout << " FILE2: input .obj file " << endl;
-	cout << " TRANSFORMS: input csv file containing a sample set of transformations" << endl;
-	cout << " QUEUE_OUTP_PREFIX: output file prefix for the queues. This contains the set of BVs and triangles that "
-			"were computed by the GPU algorithm and their values for the distances in between  " << endl;
+  cout << "Usage : ./verify_dist FILE.yaml" << endl;
+  cout << "FILE.yaml : config file for the run" << endl;
 }
 
 int main(int argc, char *argv[])
@@ -50,15 +40,19 @@ int main(int argc, char *argv[])
   std::vector<fcl::Vector3<float>> points;
   std::vector<fcl::Triangle> triangles;
 
-  if(argc != 5) {
+  if(argc != 2) {
 	  help_message();
 	  return -1;
   }
 
-  verifyDistances(argv[1], argv[2], argv[3], argv[4]);
+  map<string, string> params;
+  loadConfig(params, argv[1]);
+
+  verifyDistances(params["file1_obj"], params["file2_obj"],
+  								params["transforms"], params["outp_prefix"]);
 }
 
-void verifyDistances(string file1, string file2, string transforms_file, string node_distances_file)
+void verifyDistances(string file1, string file2, string transforms_file, string outp_prefix)
 {
 	std::vector<Transform3f> transforms;
 	loadTransformations(transforms, transforms_file);
@@ -108,7 +102,7 @@ void verifyDistances(string file1, string file2, string transforms_file, string 
 
 		// LOAD the outp.csv file
 		ifstream if3;
-		string filename = node_distances_file;
+		string filename = outp_prefix;
 		filename += '_';
 		filename += char('0' + i);
 		filename += ".outp.csv";
@@ -163,37 +157,3 @@ void verifyDistances(string file1, string file2, string transforms_file, string 
 	cout << "All Test Transforms PASSED!" << endl;
 
 }
-
-void loadTransformations(vector<Transform3f>& transforms, const string filename)
-{
-	ifstream fin;
-	fin.open(filename.c_str());
-	if(!fin.is_open())
-	{
-		help_message();
-		exit(EXIT_FAILURE);
-	}
-	string header_str;
-	for(int i = 0; i < 6; i++)
-		fin >> header_str;
-
-	float roll, pitch, yaw, x, y, z;
-
-	// read in RPY, XYZ values from the file and store them as a transform
-	while(fin >> roll >> pitch >> yaw >> x >> y >> z)
-	{
-		Eigen::Vector3f pos(x, y, z);
-
-		Eigen::AngleAxisf rollAngle(roll, Eigen::Vector3f::UnitZ());
-		Eigen::AngleAxisf yawAngle(pitch, Eigen::Vector3f::UnitY());
-		Eigen::AngleAxisf pitchAngle(yaw, Eigen::Vector3f::UnitX());
-		Eigen::Quaternion<float> q = rollAngle * yawAngle * pitchAngle;
-		Eigen::Matrix3f R = q.matrix();
-		Transform3f tf;
-		tf.linear() = q.matrix();
-		tf.translation() = pos;
-		transforms.push_back(tf);
-	}
-}
-
-
