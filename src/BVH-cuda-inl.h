@@ -132,6 +132,37 @@ __device__ void reduceLeafTasks(const BVH* bvhA, const BVH* bvhB, const Config* 
   res->dist = d_min;
 }
 
+// REQUIRES : Two bounding volumes bvA, bvB
+// MODIFIES : new_t1, new_t2
+// EFFECTS  : creates new tasks given two bounding volumes
+__device__ __inline__ void getNewTasks(const BV* bvA, const BV* bvB,
+                            Task* new_t1, Task* new_t2)
+{
+  // first over second if First is not leaf and Second is
+  if(bvA->id1 > 0 && bvB->id1 < 0)
+  {
+    new_t1->i1 = bvA->id1;
+    new_t2->i1 = bvA->id2;
+  }
+  else if(bvA->id1 > 0 && bvA->rss.size > bvB->rss.size)
+  {
+    new_t1->i1 = bvA->id1;
+    new_t2->i1 = bvA->id2;
+  }
+
+  //second over first if second is not leaf and first is
+  else if(bvB->id1 > 0 && bvA->id1 < 0 )
+  {
+    new_t1->i2 = bvB->id1;
+    new_t2->i2 = bvB->id2;
+  }
+  else if(bvB->id1 > 0)
+  {
+    new_t1->i2 = bvB->id1;
+    new_t2->i2 = bvB->id2;
+  }
+}
+
 // REQUIRES : Two bounding volume heirarchy bvhA, bvhB
 //            Config for the computation
 //            Queue of BV elements
@@ -150,9 +181,9 @@ __device__ void addBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
                           Queue* bv_q, Queue *l_q, DistanceResult* res,
                           const int num)
 {
-  BV bvA;
-  BV bvB;
   float d_min = res->dist;
+  int init_size = getSize(bv_q);
+  int j = init_size;
 
   // Evaluate BV only if stopping condition has not been met
   if(d_min > cfg->gamma)
@@ -161,8 +192,8 @@ __device__ void addBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
     for(int i = 0; i < num; i++)
     {
       Task new_t1, new_t2;
-      int arr_id = getIdFromQueue(bv_q, 0);
-      removeNFromQueue(bv_q, 1);
+      int arr_id = getIdFromQueue(bv_q, i);
+      
       new_t1.i1 = bv_q->arr[arr_id].i1;
       new_t1.i2 = bv_q->arr[arr_id].i2;
       new_t2 = new_t1;
@@ -170,60 +201,84 @@ __device__ void addBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
       // task would be added only if the distance between BVs is less than d_min
       if(bv_q->arr[arr_id].dist <= d_min)
       {
-        bvA = bvhA->bv_arr[bv_q->arr[arr_id].i1];
-        bvB = bvhB->bv_arr[bv_q->arr[arr_id].i2];
-
-        // first over second if First is not leaf and Second is
-        if(bvA.id1 > 0 && bvB.id1 < 0)
-        {
-          new_t1.i1 = bvA.id1;
-          new_t2.i1 = bvA.id2;
-        }
-        else if(bvA.id1 > 0 && bvA.rss.size > bvB.rss.size)
-        {
-          new_t1.i1 = bvA.id1;
-          new_t2.i1 = bvA.id2;
-        }
-
-        //second over first if second is not leaf and first is
-        else if(bvB.id1 > 0 && bvA.id1 < 0 )
-        {
-          new_t1.i2 = bvB.id1;
-          new_t2.i2 = bvB.id2;
-        }
-        else if(bvB.id1 > 0 && bvB.rss.size > bvA.rss.size)
-        {
-          new_t1.i2 = bvB.id1;
-          new_t2.i2 = bvB.id2;
-        }
+        getNewTasks(&bvhA->bv_arr[new_t1.i1], 
+                    &bvhB->bv_arr[new_t1.i2],
+                    &new_t1, &new_t2);
       
         // if the new elements present in tasks are leaf add them to leaf queue
-        bvA = bvhA->bv_arr[new_t1.i1];
-        bvB = bvhB->bv_arr[new_t1.i2];
-        res->tsk.i1 = new_t1.i1;
-        res->tsk.i2 = new_t1.i2;
-        if(bvA.id1 < 0 && bvB.id1 < 0)
+        const BV *bvA = &bvhA->bv_arr[new_t1.i1];
+        const BV *bvB = &bvhB->bv_arr[new_t1.i2];
+      
+        if(bvA->id1 < 0 && bvB->id1 < 0)
+        {
           addToQueue(l_q, new_t1.i1, new_t1.i2);
+          bv_q->arr[i].i1 = -1;
+        }
         else
-          addToQueue(bv_q, new_t1.i1, new_t1.i2);
+        {
+          bv_q->arr[i].i1 = new_t1.i1;
+          bv_q->arr[i].i2 = new_t1.i2;
+          bv_q->arr[i].dist = 1e37;
+        }
 
         if(isFull(bv_q))
           res->stop = STOP_CONDITION_QUEUE_FULL;
 
-        bvA = bvhA->bv_arr[new_t2.i1];
-        bvB = bvhB->bv_arr[new_t2.i2];
-        res->tsk2.i1 = new_t2.i1;
-        res->tsk2.i2 = new_t2.i2;
+        bvA = &bvhA->bv_arr[new_t2.i1];
+        bvB = &bvhB->bv_arr[new_t2.i2];
 
-        if(bvA.id1 < 0 && bvB.id1 < 0)
+        if(bvA->id1 < 0 && bvB->id1 < 0)
           addToQueue(l_q, new_t2.i1, new_t2.i2);
         else
-          addToQueue(bv_q, new_t2.i1, new_t2.i2);
+        {
+          bv_q->arr[j].i1 = new_t2.i1;
+          bv_q->arr[j].i2 = new_t2.i2;
+          bv_q->arr[j].dist = 1e37;
+          j++;
+        }
 
         if(isFull(bv_q))
           res->stop = STOP_CONDITION_QUEUE_FULL;
       }
+      else
+        bv_q->arr[i].i1 = -1;
     }
+    // move elements from last to front for empty spots
+    int last_valid = -1;
+    for(int i = 0; i < num ; i++)
+    {
+      if(bv_q->arr[i].i1 == -1)
+      {
+        if(j > num)
+        {
+          bv_q->arr[i].i1 = bv_q->arr[j-1].i1;
+          bv_q->arr[i].i2 = bv_q->arr[j-1].i2;
+          bv_q->arr[i].dist = bv_q->arr[j-1].dist;
+          j--;
+          last_valid = i;
+        }
+        else
+        {
+          // look for the next valid element in the array
+          int i2 = i + 1;
+          while(bv_q->arr[i2].i1 == -1 && i2 < num)
+            i2++;
+          
+          // if a valid element is found within array limits swap it to i
+          if(i2 < num)
+          {
+            bv_q->arr[i].i1 = bv_q->arr[i2].i1;
+            bv_q->arr[i].i2 = bv_q->arr[i2].i2;
+            bv_q->arr[i].dist = bv_q->arr[i2].dist;
+            bv_q->arr[i2].i1 = -1;
+            last_valid = i;
+          }
+        }
+      }
+      else
+        last_valid = i;
+    }
+    bv_q->size = last_valid + 1 + (j - num);
   }
   else
   {
@@ -306,8 +361,8 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
     int num_bv_tasks = getSize(bv_queue);
     dbg_var[i].total_bv = num_bv_tasks;
 
-    if(num_bv_tasks > MAX_BV_TASKS)
-      num_bv_tasks = MAX_BV_TASKS;
+    if(num_bv_tasks > cfg->max_bv_proc)
+      num_bv_tasks = cfg->max_bv_proc;
     
     dimGridBV.y = (num_bv_tasks - 1)/BLOCKSIZE_BV + 1;
     if(num_bv_tasks)

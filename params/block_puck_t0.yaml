@@ -6,5 +6,5 @@ transforms: ../CAD/transforms_set0.csv
 outp_prefix: block_puck
 gamma: 0.0001
 max_iter: 50
-max_bv_proc: 10000
+max_bv_proc: 50
 compute_min_dist: 1

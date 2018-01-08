@@ -1,3 +1,7 @@
 build/*
 *.*~
 *.exe
+*.project
+*.cproject
+*.outp.csv
+*.prof

@@ -14,8 +14,17 @@ LIB_DIRS = -L$(FCL_PATH)/build/lib
 all: dist_bvh
 
 test:
+	./dist_bvh.exe ../params/s1s2_t0.yaml
+	cat s1s2_0.outp.csv
+	echo "============"
+	cat s1s2_1.outp.csv
+
+test_puck_puck:
 	./dist_bvh.exe ../params/puck_puck_t0.yaml
-	rm block_puck_*.outp.csv
+	# cat puck_puck_0.outp.csv
+	# echo "============"
+	# cat puck_puck_1.outp.csv
+	rm puck_puck_*.outp.csv
 	../build/compute_dist_bvh ../params/puck_puck_t0.yaml
 
 test_block_puck:
