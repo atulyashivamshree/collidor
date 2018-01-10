@@ -5,6 +5,7 @@ file2_bvh: ../CAD/puck.bvh
 transforms: ../CAD/transforms_set2.csv
 outp_prefix: puck_puck
 gamma: 0.0001
-max_iter: 50
-max_bv_proc: 64
+max_iter: 80
+max_bfs_proc: 384
+max_dfs_proc: 64
 compute_min_dist: 1

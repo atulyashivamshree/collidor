@@ -16,7 +16,7 @@ all: dist_bvh
 test:
 	./dist_bvh.exe ../params/block_puck.yaml
 	# rm block_puck_*.outp.csv
-	cat block_puck_0.outp.csv
+	# cat block_puck_0.outp.csv
 	# ../build/compute_dist_bvh ../params/block_puck.yaml
 
 test_puck_puck:

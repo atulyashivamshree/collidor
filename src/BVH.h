@@ -14,7 +14,7 @@
 // stores a BV and its child information
 #define MAX_QUEUE_CAPACITY 1000000
 #define MAX_DFS_SET 128
-#define BFS_ROWS 8
+#define BFS_ROWS 12
 #define BFS_COLS 32
 
 struct Task

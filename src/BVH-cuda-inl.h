@@ -276,9 +276,6 @@ __global__ void addDFSTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
     dfs_set.size = min(t_size, set_size_max);
     dfs_extra.size = max(t_size - set_size_max, 0);
     leaf_tasks_dfs.size = lt_size;
-
-    res->idx = t_size;
-    res->idy = lt_size;
   }
 
   __syncthreads();
@@ -379,6 +376,7 @@ __global__ void addBFSTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
       }
     }
   }
+  __syncthreads();
   if(ty == 0)
   {
     setA_size[tx] = 0;
@@ -400,18 +398,52 @@ __global__ void addBFSTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   __syncthreads();
   if(tx == 0)
   {
-    tsize = 0;
-    lsize = 0;
+    if(ty == 0)
+    {
+      tsize = 0;
+      lsize = 0;
+      // res->tsk2 = taskSetA[4];
+      // res->tsk.i1 = setLeaf_size[3];
+      // res->tsk.i2 = setLeaf_size[4];
+      // res->tsk.dist = setLeaf_size[5];
+      // res->tsk2.i1 = setA_size[3];
+      // res->tsk2.i2 = setA_size[4];
+      // res->tsk2.dist = setA_size[5];
+    }
     
     for(int i = 0; i < BFS_ROWS; i++)
     {
       if(ty < setA_size[i])
-        taskSetA[tsize + ty] = taskSetA_red[i*BFS_COLS + ty];
-      tsize += setA_size[i];
+        taskSetA[tsize + ty] = taskSetA_red[i*2*BFS_COLS + ty];
+
+      if(ty + BFS_COLS < setA_size[i])
+        taskSetA[tsize + ty + BFS_COLS] = taskSetA_red[i*2*BFS_COLS + ty + BFS_COLS];
 
       if(ty < setLeaf_size[i])
-        taskSetLeaf[lsize + ty] = taskSetLeaf_red[i*BFS_COLS + ty];
-      lsize += setLeaf_size[i];
+        taskSetLeaf[lsize + ty] = taskSetLeaf_red[i*2*BFS_COLS + ty];
+
+      if(ty + BFS_COLS < setLeaf_size[i])
+        taskSetLeaf[lsize + ty+ BFS_COLS] = taskSetLeaf_red[i*2*BFS_COLS + ty+ BFS_COLS];
+      
+      __syncthreads();
+
+      if(ty == 0)
+      {
+        tsize += setA_size[i];
+        lsize += setLeaf_size[i];
+      }
+    }
+    if(ty == 0)
+    {
+      res->idx = tsize;
+      res->idy = lsize;
+      // res->tsk2 = taskSetA[4];
+      // res->tsk.i1 = setLeaf_size[3];
+      // res->tsk.i2 = setLeaf_size[4];
+      // res->tsk.dist = setLeaf_size[5];
+      // res->tsk2.i1 = setA_size[3];
+      // res->tsk2.i2 = setA_size[4];
+      // res->tsk2.dist = setA_size[5];
     }
   }
 
@@ -446,8 +478,22 @@ __global__ void addBFSTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   }
 }
 
+// REQUIRES : dfs_set
+// MODIFIES : remove from bv_q
+//            add to dfs_set
+// EFFECTS  : transfers (count) tasks from BV queue to dfs_set
+__global__ void fillDFSSet(Queue *bv_q, int count)
+{
+  int tid = threadIdx.y;
+  int start = bv_q->start;
+
+  if(tid < count)
+  {
+    dfs_set.arr[tid] = bv_q->arr[tid + start];
+  }
+}
+
 // REQUIRES : bv_q
-//            dfs_set
 //            dfs_extra
 // MODIFIES : bv_q
 //            remove from dfs_extra
@@ -521,20 +567,21 @@ __device__ void addBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
 
     
 
-    // // ADD leaf tasks from DFS to Leaf queue
-    // int leaf_set_size = leaf_tasks_dfs.size;
-    // dimBlockTasks.y = MAX_DFS_SET;
-    // dimBlockTasks.x = 1;
-    // dimGridTasks.y = (leaf_set_size - 1)/MAX_DFS_SET + 1;
-    // transferDFSandBFSLeafs<<<dimGridTasks, dimBlockTasks>>>(l_q, leaf_set_size);
-    // // Assuming capacity to be really large
-    // cudaDeviceSynchronize();
-    // l_q->last += leaf_set_size;
-    // l_q->size += leaf_set_size;
+    // ADD leaf tasks from DFS to Leaf queue
+    int leaf_set_size = leaf_tasks_dfs.size;
+    // TODO(run only if leaf tasks exist)
+    dimBlockTasks.y = MAX_DFS_SET;
+    dimBlockTasks.x = 1;
+    dimGridTasks.y = (leaf_set_size - 1)/MAX_DFS_SET + 1;
+    transferDFSandBFSLeafs<<<dimGridTasks, dimBlockTasks>>>(l_q, leaf_set_size);
+    // Assuming capacity to be really large
+    cudaDeviceSynchronize();
+    l_q->last += leaf_set_size;
+    l_q->size += leaf_set_size;
 
     // ADD extra BV tasks from DFS to BFS queue
     int dfs_extra_size = dfs_extra.size;
-    // change this
+    // TODO(run only if leaf tasks exist)
     dimBlockTasks.y = MAX_DFS_SET;
     dimBlockTasks.x = 1;
     dimGridTasks.y = (dfs_extra_size - 1)/MAX_DFS_SET + 1;
@@ -544,6 +591,21 @@ __device__ void addBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
     dfs_extra.size = 0;
     bv_q->last += dfs_extra_size;
     bv_q->size += dfs_extra_size;
+
+    // FILL up the DFS set if it is empty
+    int dfs_size = dfs_set.size;
+    int max_dfs_size = cfg->max_dfs_proc;
+    if(dfs_size == 0 && bv_q->size > max_dfs_size)
+    {
+      dimBlockTasks.y = MAX_DFS_SET;
+      dimBlockTasks.x = 1;
+      dimGridTasks.y = (max_dfs_size - 1)/MAX_DFS_SET + 1;
+      fillDFSSet<<<dimGridTasks, dimBlockTasks>>>(bv_q, max_dfs_size);
+      cudaDeviceSynchronize();
+      bv_q->start += max_dfs_size;
+      bv_q->size -= max_dfs_size;
+      dfs_set.size = max_dfs_size;
+    }
 
   }
   else
@@ -714,7 +776,6 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
     dbg_var[i].tsk1 = dfs_set.arr[0];
     dbg_var[i].tsk2 = dfs_set.arr[1];
 
-    res.tsk.i1 = l_queue->size;
   }
 
   // TODO probably remove the next 4

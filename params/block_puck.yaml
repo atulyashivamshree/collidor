@@ -2,10 +2,10 @@ file1_obj: ../CAD/block.obj
 file2_obj: ../CAD/puck.obj
 file1_bvh: ../CAD/block.bvh
 file2_bvh: ../CAD/puck.bvh
-transforms: ../CAD/transforms_set0.csv
+transforms: ../CAD/transforms_set2.csv
 outp_prefix: block_puck
 gamma: 0.0001
-max_iter: 10
-max_bfs_proc: 128
-max_dfs_proc: 32
-compute_min_dist: 0
+max_iter: 40
+max_bfs_proc: 256
+max_dfs_proc: 64
+compute_min_dist: 1
