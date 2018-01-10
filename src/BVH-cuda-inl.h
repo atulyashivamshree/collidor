@@ -542,7 +542,7 @@ __global__ void transferDFSandBFSLeafs(Queue* l_q, int set_size)
 __device__ void addBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
                           Queue* bv_q, Queue *l_q, 
                           DistanceResult* res,
-                          const int num_bfs_tasks)
+                          int num_bfs_tasks)
 {
   float d_min = res->dist;
   dim3 dimBlockTasks(1,BLOCKSIZE_TASKS_ADDER);
@@ -561,9 +561,15 @@ __device__ void addBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
     dimBlockTasks.y = BFS_COLS;
     dimBlockTasks.x = BFS_ROWS;
     dimGridTasks.y = 1;
-    addBFSTasks<<<dimGridTasks, dimBlockTasks>>>(bvhA, bvhB, cfg, 
-                                              bv_q, l_q, res, num_bfs_tasks);
-    cudaDeviceSynchronize();
+    while(num_bfs_tasks > 0)
+    {
+      int num_tasks_run = min(num_bfs_tasks, BFS_ROWS * BFS_COLS);
+      addBFSTasks<<<dimGridTasks, dimBlockTasks>>>(bvhA, bvhB, cfg, 
+                                                bv_q, l_q, res, num_tasks_run);
+      cudaDeviceSynchronize();
+
+      num_bfs_tasks -= num_tasks_run;
+    }
 
     
 
@@ -738,7 +744,7 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
       processBVTasks<<<dimGridBV, dimBlockBV>>>(bvhA, bvhB, cfg, bv_queue, 
                                         num_bfs_tasks);
     }
-    cudaDeviceSynchronize();
+    // cudaDeviceSynchronize();
 
     // PROCESS THE LEAF NODE TASKS
     int num_leaf_tasks = getSize(l_queue);
