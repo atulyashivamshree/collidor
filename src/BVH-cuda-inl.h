@@ -18,10 +18,9 @@
 #ifndef BVH_CUDA_INL_H_
 #define BVH_CUDA_INL_H_
 
-#define MAX_QUEUE_CAPACITY 1000000
-#define MAX_BV_TASKS 10000
 #define BLOCKSIZE_BV 32
-#define BLOCKSIZE_LEAF 16
+#define BLOCKSIZE_LEAF 32
+#define BLOCKSIZE_TASKS_ADDER 32
 
 #define STOP_CONDITION_QUEUE_FULL 2
 #define STOP_CONDITION_BELOW_THRESH 3
@@ -33,9 +32,14 @@ using Transform3f = Eigen::Transform<float, 3, Eigen::AffineCompact>;
 
 struct DebugVar
 {
+  int dfs_bv;
   int total_bv;
   int proc_bv;
   int num_tri;
+
+  Task tsk1;
+  Task tsk2;
+
 };
 struct DistanceResult
 {
@@ -47,6 +51,11 @@ struct DistanceResult
   unsigned int idx;
   unsigned int idy;
 };
+
+// DECLARE DEVICE GLOBAL VARIABLES HERE
+__device__ Set dfs_set;
+__device__ Set dfs_extra;
+__device__ Set leaf_tasks_dfs;
 
 // REQUIRES : A valid queue
 // MODIFIES : The queue structure
@@ -164,6 +173,313 @@ __device__ __inline__ void getNewTasks(const BV* bvA, const BV* bvB,
 }
 
 // REQUIRES : Two bounding volume heirarchy bvhA, bvhB
+//            dfs_set
+//            res->dist for deciding whether to split
+// MODIFIES : dfs_set, dfs_extra, l_q
+// EFFECTS  : processes tasks from dfs_set and adds them either to the same
+//            set or to the dfs_xtra set if the new task is a BV
+//            if the new task is leaf adds it to the leaf_tasks
+//  TODO(ADV write for it to handle multiple blocks)
+__global__ void addDFSTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
+                          DistanceResult* res)
+{
+  __shared__ Task taskSetA[MAX_DFS_SET*2];
+  __shared__ Task taskSetA_red[MAX_DFS_SET*2];
+  __shared__ Task taskSetLeaf[MAX_DFS_SET*2];
+  __shared__ Task taskSetLeaf_red[MAX_DFS_SET*2];
+
+  __shared__ int set_size, set_size_max;
+  __shared__ int t_size, lt_size;
+
+  int tid = threadIdx.y;
+  set_size = dfs_set.size;
+  set_size_max = cfg->max_dfs_proc;
+  float d_min = res->dist;
+
+  Task new_t1, new_t2;
+  new_t1.i1 = dfs_set.arr[tid].i1;
+  new_t1.i2 = dfs_set.arr[tid].i2;
+  new_t1.dist = 1e37;
+  new_t2 = new_t1;
+
+  if(tid < set_size)
+  {
+    if(dfs_set.arr[tid].dist <= d_min)
+    {
+      getNewTasks(&bvhA->bv_arr[new_t1.i1],
+                  &bvhB->bv_arr[new_t1.i2],
+                  &new_t1, &new_t2);
+
+      // if the new elements present in tasks are leaf add them to leaf queue
+      const BV *bvA = &bvhA->bv_arr[new_t1.i1];
+      const BV *bvB = &bvhB->bv_arr[new_t1.i2];
+    
+      if(bvA->id1 < 0 && bvB->id1 < 0)
+      {
+        taskSetLeaf[2*tid] = new_t1;
+        taskSetA[2*tid].i1 = -1;
+      }
+      else
+      {
+        taskSetLeaf[2*tid].i1 = -1;
+        taskSetA[2*tid] = new_t1;
+      }
+
+      bvA = &bvhA->bv_arr[new_t2.i1];
+      bvB = &bvhB->bv_arr[new_t2.i2];
+
+      if(bvA->id1 < 0 && bvB->id1 < 0)
+      {
+        taskSetLeaf[2*tid + 1] = new_t2;
+        taskSetA[2*tid + 1].i1 = -1;
+      }
+      else
+      {
+        taskSetLeaf[2*tid + 1].i1 = -1;
+        taskSetA[2*tid + 1] = new_t2;
+      }
+    }
+    else
+    {
+      //TODO(ADV OPT) remove this else and place everything before
+      taskSetA[2*tid].i1 = -1;
+      taskSetA[2*tid + 1].i1 = -1;
+      taskSetLeaf[2*tid].i1 = -1;
+      taskSetLeaf[2*tid + 1].i1 = -1;
+    }
+
+  }
+
+  __syncthreads();
+
+  // REDUCE THE TASKS TO A CONTIGUOUS LIST
+  if(tid == 0)
+  {
+    t_size = 0;
+    lt_size = 0;
+    //TODO(OPT) avenue to further optimize
+    for(int i = 0; i < 2*set_size; i++)
+    {
+      if(taskSetA[i].i1 >= 0)
+      {
+        taskSetA_red[t_size] = taskSetA[i];
+        t_size++;
+      }
+
+      if(taskSetLeaf[i].i1 >= 0)
+      {
+        taskSetLeaf_red[lt_size] = taskSetLeaf[i];
+        lt_size++;
+      }
+    }
+
+    dfs_set.size = min(t_size, set_size_max);
+    dfs_extra.size = max(t_size - set_size_max, 0);
+    leaf_tasks_dfs.size = lt_size;
+
+    res->idx = t_size;
+    res->idy = lt_size;
+  }
+
+  __syncthreads();
+
+  //COPY OVER TO DFS_TASKS OR DFS_EXTRA OR LEAF_TASKS
+  if(tid < dfs_set.size)
+    dfs_set.arr[tid] = taskSetA_red[tid];
+
+  if(tid < dfs_extra.size)
+    dfs_extra.arr[tid] = taskSetA_red[tid + set_size_max];
+
+  if(2*tid < lt_size)
+    leaf_tasks_dfs.arr[2*tid] = taskSetLeaf_red[2*tid];
+
+  if(2*tid + 1 < lt_size)
+    leaf_tasks_dfs.arr[2*tid + 1] = taskSetLeaf_red[2*tid + 1];
+
+  __threadfence_block();
+}
+
+// REQUIRES : Two bounding volume heirarchy bvhA, bvhB
+//            bv_q
+//            res->dist for deciding whether to split
+// MODIFIES : bv_q, l_q
+//            res
+// EFFECTS  : processes tasks from the input queue and adds them to the same
+//            queue if its a BV task or to the leaf task queue
+//  TODO(ADV write for it to handle multiple blocks)
+__global__ void addBFSTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
+                          Queue* bv_q, Queue *l_q, DistanceResult* res,
+                          const int num)
+{
+
+  int tx = threadIdx.x;
+  int ty = threadIdx.y;
+  int tid = threadIdx.x * blockDim.y + threadIdx.y;
+  float d_min = res->dist;
+
+  __shared__ Task taskSetA[BFS_ROWS*BFS_COLS*2];
+  __shared__ Task taskSetA_red[BFS_ROWS*BFS_COLS*2];
+  __shared__ Task taskSetLeaf[BFS_ROWS*BFS_COLS*2];
+  __shared__ Task taskSetLeaf_red[BFS_ROWS*BFS_COLS*2];
+
+  __shared__ int setA_size[BFS_ROWS];
+  __shared__ int setLeaf_size[BFS_ROWS];
+  __shared__ int tsize, lsize;
+
+  taskSetA[tx*2*BFS_COLS + 2*ty].i1 = -1;
+  taskSetA[tx*2*BFS_COLS + 2*ty + 1].i1 = -1;
+  taskSetLeaf[tx*2*BFS_COLS + 2*ty].i1 = -1;
+  taskSetLeaf[tx*2*BFS_COLS + 2*ty + 1].i1 = -1;
+
+  int start = bv_q->start;
+  int last = bv_q->last;
+
+  Task new_t1, new_t2;
+  new_t1.i1 = bv_q->arr[start + tid].i1;
+  new_t1.i2 = bv_q->arr[start + tid].i2;
+  float bv_dist = bv_q->arr[start + tid].dist;
+  new_t1.dist = 1e37;
+  new_t2 = new_t1;
+
+  if(tid < num)
+  {
+    if(bv_dist <= d_min)
+    {
+      getNewTasks(&bvhA->bv_arr[new_t1.i1],
+                  &bvhB->bv_arr[new_t1.i2],
+                  &new_t1, &new_t2);
+
+      // if the new elements present in tasks are leaf add them to leaf queue
+      const BV *bvA = &bvhA->bv_arr[new_t1.i1];
+      const BV *bvB = &bvhB->bv_arr[new_t1.i2];
+    
+      if(bvA->id1 < 0 && bvB->id1 < 0)
+      {
+        taskSetLeaf[tx*2*BFS_COLS + 2*ty] = new_t1;
+        taskSetA[tx*2*BFS_COLS + 2*ty].i1 = -1;
+      }
+      else
+      {
+        taskSetLeaf[tx*2*BFS_COLS + 2*ty].i1 = -1;
+        taskSetA[tx*2*BFS_COLS + 2*ty] = new_t1;
+      }
+
+      bvA = &bvhA->bv_arr[new_t2.i1];
+      bvB = &bvhB->bv_arr[new_t2.i2];
+
+      if(bvA->id1 < 0 && bvB->id1 < 0)
+      {
+        taskSetLeaf[tx*2*BFS_COLS + 2*ty + 1] = new_t2;
+        taskSetA[tx*2*BFS_COLS + 2*ty + 1].i1 = -1;
+      }
+      else
+      {
+        taskSetLeaf[tx*2*BFS_COLS + 2*ty + 1].i1 = -1;
+        taskSetA[tx*2*BFS_COLS + 2*ty + 1] = new_t2;
+      }
+    }
+  }
+  if(ty == 0)
+  {
+    setA_size[tx] = 0;
+    setLeaf_size[tx] = 0;
+    for(int i = 0; i < 2*BFS_COLS; i++)
+    {
+      if(taskSetA[tx*2*BFS_COLS + i].i1 >= 0)
+      {
+        taskSetA_red[tx*2*BFS_COLS + setA_size[tx]] = taskSetA[tx*2*BFS_COLS + i];
+        setA_size[tx]++;
+      }
+      if(taskSetLeaf[tx*2*BFS_COLS + i].i1 >= 0)
+      {
+        taskSetLeaf_red[tx*2*BFS_COLS + setLeaf_size[tx]] = taskSetLeaf[tx*2*BFS_COLS + i];
+        setLeaf_size[tx]++;
+      }
+    }
+  }
+  __syncthreads();
+  if(tx == 0)
+  {
+    tsize = 0;
+    lsize = 0;
+    
+    for(int i = 0; i < BFS_ROWS; i++)
+    {
+      if(ty < setA_size[i])
+        taskSetA[tsize + ty] = taskSetA_red[i*BFS_COLS + ty];
+      tsize += setA_size[i];
+
+      if(ty < setLeaf_size[i])
+        taskSetLeaf[lsize + ty] = taskSetLeaf_red[i*BFS_COLS + ty];
+      lsize += setLeaf_size[i];
+    }
+  }
+
+  __syncthreads();
+  if(2*tid < tsize)
+    bv_q->arr[last + 2*tid] = taskSetA[2*tid];
+  if(2*tid + 1 < tsize)
+    bv_q->arr[last + 2*tid + 1] = taskSetA[2*tid + 1];
+
+  __syncthreads();
+  if(tid == 0)
+  { 
+    // Assuming capacity to be really large
+    bv_q->start += num;
+    bv_q->last += tsize;
+    bv_q->size += (tsize - num);
+  }
+
+  last = l_q->last;
+  __syncthreads();
+
+  if(2*tid < lsize)
+    l_q->arr[last + 2*tid] = taskSetLeaf[2*tid];
+  if(2*tid + 1 < lsize)
+    l_q->arr[last + 2*tid + 1] = taskSetLeaf[2*tid + 1];
+
+  __syncthreads();
+  if(tid == 0)
+  {
+    l_q->last += lsize;
+    l_q->size += lsize;
+  }
+}
+
+// REQUIRES : bv_q
+//            dfs_set
+//            dfs_extra
+// MODIFIES : bv_q
+//            remove from dfs_extra
+// EFFECTS  : transfers tasks from dfs_extra to BV queue
+__global__ void transferDFSandBFS(Queue* bv_q, int dfs_extra_size, DistanceResult* res)
+{
+  int tid = threadIdx.y;
+  int last = bv_q->last;
+
+  if(tid < dfs_extra_size)
+  {
+    bv_q->arr[last + tid] = dfs_extra.arr[tid];
+  }
+
+  __syncthreads();
+}
+
+// REQUIRES : leaf_tasks_dfs 
+// MODIFIES : l_q
+// EFFECTS  : transfers tasks from dfs set to leaf queue
+__global__ void transferDFSandBFSLeafs(Queue* l_q, int set_size)
+{
+  
+  int last = l_q->last;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if(j < set_size)
+    l_q->arr[j + last] = leaf_tasks_dfs.arr[j];
+}
+
+
+// REQUIRES : Two bounding volume heirarchy bvhA, bvhB
 //            Config for the computation
 //            Queue of BV elements
 //            DistanceResult to update results
@@ -178,111 +494,86 @@ __device__ __inline__ void getNewTasks(const BV* bvA, const BV* bvB,
 //            Stopping conditions inside DistResult
 //            TODO : parallelize this over multiple threads
 __device__ void addBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
-                          Queue* bv_q, Queue *l_q, DistanceResult* res,
-                          const int num)
+                          Queue* bv_q, Queue *l_q, 
+                          DistanceResult* res,
+                          const int num_bfs_tasks)
 {
   float d_min = res->dist;
-  int init_size = getSize(bv_q);
-  int j = init_size;
+  dim3 dimBlockTasks(1,BLOCKSIZE_TASKS_ADDER);
+  dim3 dimGridTasks(1,1);
 
   // Evaluate BV only if stopping condition has not been met
   if(d_min > cfg->gamma)
   {
-    // next split and add tasks if necessary
-    for(int i = 0; i < num; i++)
-    {
-      Task new_t1, new_t2;
-      int arr_id = getIdFromQueue(bv_q, i);
-      
-      new_t1.i1 = bv_q->arr[arr_id].i1;
-      new_t1.i2 = bv_q->arr[arr_id].i2;
-      new_t2 = new_t1;
+    // PROCESS the DFS Set
+    dimBlockTasks.y = MAX_DFS_SET;
+    dimGridTasks.y = 1;
+    addDFSTasks<<<dimGridTasks, dimBlockTasks>>>(bvhA, bvhB, cfg, res);
+    cudaDeviceSynchronize();
 
-      // task would be added only if the distance between BVs is less than d_min
-      if(bv_q->arr[arr_id].dist <= d_min)
-      {
-        getNewTasks(&bvhA->bv_arr[new_t1.i1], 
-                    &bvhB->bv_arr[new_t1.i2],
-                    &new_t1, &new_t2);
-      
-        // if the new elements present in tasks are leaf add them to leaf queue
-        const BV *bvA = &bvhA->bv_arr[new_t1.i1];
-        const BV *bvB = &bvhB->bv_arr[new_t1.i2];
-      
-        if(bvA->id1 < 0 && bvB->id1 < 0)
-        {
-          addToQueue(l_q, new_t1.i1, new_t1.i2);
-          bv_q->arr[i].i1 = -1;
-        }
-        else
-        {
-          bv_q->arr[i].i1 = new_t1.i1;
-          bv_q->arr[i].i2 = new_t1.i2;
-          bv_q->arr[i].dist = 1e37;
-        }
+    // ADD BFS tasks
+    dimBlockTasks.y = BFS_COLS;
+    dimBlockTasks.x = BFS_ROWS;
+    dimGridTasks.y = 1;
+    addBFSTasks<<<dimGridTasks, dimBlockTasks>>>(bvhA, bvhB, cfg, 
+                                              bv_q, l_q, res, num_bfs_tasks);
+    cudaDeviceSynchronize();
 
-        if(isFull(bv_q))
-          res->stop = STOP_CONDITION_QUEUE_FULL;
+    
 
-        bvA = &bvhA->bv_arr[new_t2.i1];
-        bvB = &bvhB->bv_arr[new_t2.i2];
+    // // ADD leaf tasks from DFS to Leaf queue
+    // int leaf_set_size = leaf_tasks_dfs.size;
+    // dimBlockTasks.y = MAX_DFS_SET;
+    // dimBlockTasks.x = 1;
+    // dimGridTasks.y = (leaf_set_size - 1)/MAX_DFS_SET + 1;
+    // transferDFSandBFSLeafs<<<dimGridTasks, dimBlockTasks>>>(l_q, leaf_set_size);
+    // // Assuming capacity to be really large
+    // cudaDeviceSynchronize();
+    // l_q->last += leaf_set_size;
+    // l_q->size += leaf_set_size;
 
-        if(bvA->id1 < 0 && bvB->id1 < 0)
-          addToQueue(l_q, new_t2.i1, new_t2.i2);
-        else
-        {
-          bv_q->arr[j].i1 = new_t2.i1;
-          bv_q->arr[j].i2 = new_t2.i2;
-          bv_q->arr[j].dist = 1e37;
-          j++;
-        }
+    // ADD extra BV tasks from DFS to BFS queue
+    int dfs_extra_size = dfs_extra.size;
+    // change this
+    dimBlockTasks.y = MAX_DFS_SET;
+    dimBlockTasks.x = 1;
+    dimGridTasks.y = (dfs_extra_size - 1)/MAX_DFS_SET + 1;
+    transferDFSandBFS<<<dimGridTasks, dimBlockTasks>>>(bv_q, dfs_extra_size, res);
+    // Assuming capacity to be really large
+    cudaDeviceSynchronize();
+    dfs_extra.size = 0;
+    bv_q->last += dfs_extra_size;
+    bv_q->size += dfs_extra_size;
 
-        if(isFull(bv_q))
-          res->stop = STOP_CONDITION_QUEUE_FULL;
-      }
-      else
-        bv_q->arr[i].i1 = -1;
-    }
-    // move elements from last to front for empty spots
-    int last_valid = -1;
-    for(int i = 0; i < num ; i++)
-    {
-      if(bv_q->arr[i].i1 == -1)
-      {
-        if(j > num)
-        {
-          bv_q->arr[i].i1 = bv_q->arr[j-1].i1;
-          bv_q->arr[i].i2 = bv_q->arr[j-1].i2;
-          bv_q->arr[i].dist = bv_q->arr[j-1].dist;
-          j--;
-          last_valid = i;
-        }
-        else
-        {
-          // look for the next valid element in the array
-          int i2 = i + 1;
-          while(bv_q->arr[i2].i1 == -1 && i2 < num)
-            i2++;
-          
-          // if a valid element is found within array limits swap it to i
-          if(i2 < num)
-          {
-            bv_q->arr[i].i1 = bv_q->arr[i2].i1;
-            bv_q->arr[i].i2 = bv_q->arr[i2].i2;
-            bv_q->arr[i].dist = bv_q->arr[i2].dist;
-            bv_q->arr[i2].i1 = -1;
-            last_valid = i;
-          }
-        }
-      }
-      else
-        last_valid = i;
-    }
-    bv_q->size = last_valid + 1 + (j - num);
   }
   else
   {
     res->stop = STOP_CONDITION_BELOW_THRESH;
+  }
+}
+
+// REQUIRES : Two bounding volume heirarchy bvhA, bvhB
+//            Config for the computation
+//            Queue of BV elements
+//            num : the number of leaf tasks that have been updated
+// MODIFIES : BV queue (distance values for each task)
+// EFFECTS  : Extract num BVs from the BV queue and evaluates them for pairwise 
+//            distance
+__global__ void processBVTasksFromSet(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
+                             const int num)
+{
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if(j < num)
+  {
+    Task t = dfs_set.arr[j];
+    BV bvA = bvhA->bv_arr[t.i1];
+    BV bvB = bvhB->bv_arr[t.i2];
+
+    RSSResult res;
+    computeDistance(&bvA.rss, &bvB.rss, cfg->R, cfg->t, &res);
+
+    dfs_set.arr[j].dist = res.dist;
   }
 }
 
@@ -343,9 +634,12 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
                       DebugVar* dbg_var, DistanceResult *result)
 {
   // start of with the roots in the queue
+  dfs_set.arr[0] = Task({0, 0, 1e37});
+  dfs_set.size = 1;
+
   initializeQueue(bv_queue);
   initializeQueue(l_queue);
-  addToQueue(bv_queue, 0, 0);
+  // addToQueue(bv_queue, 0, 0);
 
   DistanceResult res = *result;
 
@@ -354,21 +648,33 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   dim3 dimBlockLeaf(1, BLOCKSIZE_LEAF);
   dim3 dimGridLeaf(1,1);
 
-  int i;
-  for(i = 0;i < cfg->max_iter && (res.stop == 0); i++)
-  {
-    // PROCESS THE BV TREE NODE TASKS
-    int num_bv_tasks = getSize(bv_queue);
-    dbg_var[i].total_bv = num_bv_tasks;
+  int num_dfs_tasks;
+  int num_bfs_tasks;
 
-    if(num_bv_tasks > cfg->max_bv_proc)
-      num_bv_tasks = cfg->max_bv_proc;
+  int i;
+  for(i = 0; (i < cfg->max_iter) && (res.stop == 0); i++)
+  {
+    num_dfs_tasks = dfs_set.size;
+
+    dimGridBV.y = (num_dfs_tasks - 1)/BLOCKSIZE_BV + 1;
+    if(num_dfs_tasks)
+    {
+      processBVTasksFromSet<<<dimBlockBV, dimBlockBV>>>(bvhA, bvhB, cfg,
+                                                        num_dfs_tasks);
+    }
+
+    // PROCESS THE BV TREE NODE BFS TASKS
+    num_bfs_tasks = getSize(bv_queue);
+    dbg_var[i].total_bv = num_bfs_tasks;
+
+    if(num_bfs_tasks > cfg->max_bfs_proc)
+      num_bfs_tasks = cfg->max_bfs_proc;
     
-    dimGridBV.y = (num_bv_tasks - 1)/BLOCKSIZE_BV + 1;
-    if(num_bv_tasks)
+    dimGridBV.y = (num_bfs_tasks - 1)/BLOCKSIZE_BV + 1;
+    if(num_bfs_tasks)
     {
       processBVTasks<<<dimGridBV, dimBlockBV>>>(bvhA, bvhB, cfg, bv_queue, 
-                                        num_bv_tasks);
+                                        num_bfs_tasks);
     }
     cudaDeviceSynchronize();
 
@@ -383,6 +689,12 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
     }
     cudaDeviceSynchronize();
 
+    // ADD MORE TASKS FROM BV TREE
+    addBVTasks(bvhA, bvhB, cfg,
+              bv_queue, l_queue, 
+              result, num_bfs_tasks);
+    cudaDeviceSynchronize();
+
     // REDUCE THE LEAF TREE DATA
     if(cfg->enable_distance_reduction)
     {
@@ -390,21 +702,22 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
       cudaDeviceSynchronize();
     }
 
-    // ADD MORE TASKS FROM BV TREE
-    addBVTasks(bvhA, bvhB, cfg, bv_queue, l_queue, result, num_bv_tasks);
-    cudaDeviceSynchronize();
-
     res = *result;
 
     // CHECK FOR STOPPING CONDITION
-    if(num_bv_tasks == 0 && num_leaf_tasks == 0)
+    if(num_dfs_tasks == 0 && num_bfs_tasks == 0 && num_leaf_tasks == 0)
       res.stop = STOP_CONDITION_COMPLETED;
 
-    dbg_var[i].proc_bv = num_bv_tasks;
+    dbg_var[i].dfs_bv = num_dfs_tasks;
+    dbg_var[i].proc_bv = num_bfs_tasks;
     dbg_var[i].num_tri = num_leaf_tasks;
+    dbg_var[i].tsk1 = dfs_set.arr[0];
+    dbg_var[i].tsk2 = dfs_set.arr[1];
 
+    res.tsk.i1 = l_queue->size;
   }
 
+  // TODO probably remove the next 4
   BV bvA = bvhA->bv_arr[2];
   BV bvB = bvhB->bv_arr[0];
 
@@ -412,21 +725,23 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   computeDistance(&bvA.rss, &bvB.rss,cfg->R, cfg->t, &rss_res);
 
   *result = res;
-  result->tsk.dist = rss_res.dist;
-  result->idx = bv_queue->size;
-  result->idy = l_queue->size;
+  
   result->num_iter = i;
+
   // result->dist = bv_queue->arr[0].i1;
 }
 
 __host__ void printDebugInfo(DebugVar* arr, int size)
 {
   cout << std::setprecision(4);
-  cout << "ITER, TOTAL_BV, NUM_BV_PROC, NUM_TRI " << endl;
+  cout << "ITER, DFS_BV, TOTAL_BV, NUM_BV_PROC, NUM_TRI " << endl;
   for(int i = 0; i < size; i++)
   {
-    cout << " [" << i << "] : " << arr[i].total_bv << ", " << arr[i].proc_bv
-            << ", " << arr[i].num_tri << endl;
+    cout << " [" << i << "] : " << arr[i].dfs_bv << ", " << arr[i].total_bv << 
+        ", " << arr[i].proc_bv << ", " << arr[i].num_tri;
+    cout << "| 1: " << arr[i].tsk1.i1 << ", " << arr[i].tsk1.i2 << ", " << 
+        arr[i].tsk1.dist << "| 2: " << arr[i].tsk2.i1 << ", " <<
+        arr[i].tsk2.i2 << ", " << arr[i].tsk2.dist << endl;
   }
 }
 
@@ -494,6 +809,11 @@ __host__ std::vector<DistanceResult> computeDistance(const BVH* bvh1, const BVH*
   cudaMalloc(&h_leafq.arr, h_leafq.max_capacity * sizeof(Task));
   cudaMalloc(&d_leafq, sizeof(Queue));
 
+  // Set h_dfs_set({NULL, 0, MAX_DFS_SET});
+  // Set *d_dfs_set;
+  // cudaMalloc(&h_dfs_set.arr, h_dfs_set.max_capacity * sizeof(Task));
+  // cudaMalloc(&d_dfs_set, sizeof(Set));
+
   //CREATE THE CONFIG VARS
   Config *d_cfg;
   cudaMalloc(&d_cfg, sizeof(Config));
@@ -523,6 +843,7 @@ __host__ std::vector<DistanceResult> computeDistance(const BVH* bvh1, const BVH*
   //COPY OVER QUEUES
   cudaMemcpy(d_bvq, &h_bvq, sizeof(Queue), cudaMemcpyHostToDevice);
   cudaMemcpy(d_leafq, &h_leafq, sizeof(Queue), cudaMemcpyHostToDevice);
+  // cudaMemcpy(d_dfs_set, &h_dfs_set, sizeof(Set), cudaMemcpyHostToDevice);
 
   for(int i = 0; i < transforms.size(); i++)
   {

@@ -5,3 +5,4 @@ build/*
 *.cproject
 *.outp.csv
 *.prof
+*.*#

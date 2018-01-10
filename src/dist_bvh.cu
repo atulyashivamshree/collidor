@@ -40,7 +40,8 @@ __host__ int main(int argc, char *argv[])
   def_cfg.gamma = std::stod(params["gamma"]);
   def_cfg.enable_distance_reduction = std::stoi(params["compute_min_dist"]);
   def_cfg.max_iter = std::stoi(params["max_iter"]);
-  def_cfg.max_bv_proc = std::stoi(params["max_bv_proc"]);
+  def_cfg.max_bfs_proc = std::stoi(params["max_bfs_proc"]);
+  def_cfg.max_dfs_proc = std::stoi(params["max_dfs_proc"]);
   
   // Load the two BVH in consideration
   BVH bvhA, bvhB;

@@ -12,6 +12,10 @@
 #define BVH_H_
 
 // stores a BV and its child information
+#define MAX_QUEUE_CAPACITY 1000000
+#define MAX_DFS_SET 128
+#define BFS_ROWS 8
+#define BFS_COLS 32
 
 struct Task
 {
@@ -46,6 +50,12 @@ struct Queue
   unsigned int max_capacity;
 };
 
+struct Set
+{
+  Task arr[MAX_DFS_SET];
+  unsigned int size;
+};
+
 struct Config
 {
   float gamma;
@@ -53,7 +63,8 @@ struct Config
   float R[3][3];
   float t[3];
   int enable_distance_reduction;  // set it to 0 to print get distance on all possible leaf elements without early termination
-  int max_bv_proc;
+  int max_dfs_proc;
+  int max_bfs_proc;
 };
 
 // probably move them to BVH-cuda.cu

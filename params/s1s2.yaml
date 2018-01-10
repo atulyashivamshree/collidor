@@ -6,5 +6,6 @@ transforms: ../CAD/transforms_set2.csv
 outp_prefix: s1s2
 gamma: 0.0001
 max_iter: 50
-max_bv_proc: 2
+max_bfs_proc: 1
+max_dfs_proc: 1
 compute_min_dist: 1

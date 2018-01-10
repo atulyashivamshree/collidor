@@ -14,10 +14,10 @@ LIB_DIRS = -L$(FCL_PATH)/build/lib
 all: dist_bvh
 
 test:
-	./dist_bvh.exe ../params/s1s2_t0.yaml
-	cat s1s2_0.outp.csv
-	echo "============"
-	cat s1s2_1.outp.csv
+	./dist_bvh.exe ../params/block_puck.yaml
+	# rm block_puck_*.outp.csv
+	cat block_puck_0.outp.csv
+	# ../build/compute_dist_bvh ../params/block_puck.yaml
 
 test_puck_puck:
 	./dist_bvh.exe ../params/puck_puck_t0.yaml
@@ -32,10 +32,15 @@ test_block_puck:
 	rm block_puck_*.outp.csv
 	../build/compute_dist_bvh ../params/block_puck.yaml
 
+test_block_s1:
+	./dist_bvh.exe ../params/block_s1_t0.yaml
+	# rm block_s1_*.outp.csv
+	../build/compute_dist_bvh ../params/block_s1_t0.yaml
+
 test_s1_s2:
-	./dist_bvh.exe ../params/s1s2.yaml
-	rm s1s2_*.outp.csv
-	../build/compute_dist_bvh ../params/s1s2.yaml
+	./dist_bvh.exe ../params/s1s2_t0.yaml
+	# rm s1s2_*.outp.csv
+	../build/compute_dist_bvh ../params/s1s2_t0.yaml
 
 test_block_puck_queue:
 	./dist_bvh.exe ../params/block_puck.yaml
