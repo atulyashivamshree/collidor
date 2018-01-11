@@ -62,7 +62,7 @@ dist_bvh: $(SRC3) $(SRC4)
 
 test_bvh_basics: $(SRC5)
 	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) $(SRC5) -o test_bvh.exe
-	./test_bvh.exe
+	./test_bvh.exe ../CAD/tasks0.csv
 
 test_triangles:
 	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) $(SRC1) -o test_triangles.exe

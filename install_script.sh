@@ -1,4 +1,6 @@
 sudo apt-get install libccd-dev
+sudo apt-get install libeigen3-dev
+cd ~/eecs587
 git clone https://github.com/flexible-collision-library/fcl.git
 cd fcl
 mkdir build

@@ -12,6 +12,7 @@
 #include <iostream>
 #include <iomanip>
 #include <algorithm>
+#include <vector>
 
 #include <unistd.h>
 
@@ -21,6 +22,8 @@
 #define BLOCKSIZE_BV 32
 #define BLOCKSIZE_LEAF 32
 #define BLOCKSIZE_TASKS_ADDER 32
+#define BLOCKSIZE_RED 1024
+#define MAX_BLOCKS_RED  8192/(2*BLOCKSIZE_RED)
 
 #define STOP_CONDITION_QUEUE_FULL 2
 #define STOP_CONDITION_BELOW_THRESH 3
@@ -113,33 +116,100 @@ __device__ __inline__ int isFull(const Queue* bvq) {
   return 0;
 }
 
-// REQUIRES : Array of tasks
+// REQUIRES : Array of tasks all of which are valid
 //            starting value of tasks
-//            number of tasks to reduce
+//            num < 2*BLOCKDIM_RED
 // MODIFIES : res
 // EFFECTS  : computes the minimum distance of all tasks
-__global__ void computeMin(const int start, const int num,
+__global__ void computeMin(const Task* arr, const int start, const int num,
                           float* res)
 {
-  // int ty = threadIdx.y;
-  int tid = threadIdx.x * blockDim.y + threadIdx.y;
+  // ASUMING blockDim.y == BLOCSIZE_RED
+  int ty = threadIdx.y;
+  int tid = blockIdx.y*2*BLOCKSIZE_RED + threadIdx.y;
 
-  if(tid == 0)
-    *res = 1;
+  __shared__ float min_vals[2*BLOCKSIZE_RED];
+  float val1 = 1e38, val2 = 1e38;
+
+  int stepsize = BLOCKSIZE_RED;
+
+  if(tid < num && arr[start + tid].i1 >= 0)
+    min_vals[ty] = arr[start + tid].dist;
+  else
+    min_vals[ty] = 1e38;
+
+  if(tid + BLOCKSIZE_RED < num && arr[start + tid + BLOCKSIZE_RED].i1 >= 0)
+    min_vals[ty + BLOCKSIZE_RED] = arr[start + tid + BLOCKSIZE_RED].dist;
+  else
+    min_vals[ty + BLOCKSIZE_RED] = 1e38;
+
+  __syncthreads();
+
+  while(stepsize > 0)
+  {
+    if(ty < stepsize)
+    {
+      val1 = min_vals[ty];
+      val2 = min_vals[ty + stepsize];
+
+      min_vals[ty] = min(val1, val2);
+    }
+
+    stepsize = stepsize/2;
+    __syncthreads();
+  }
+
+  if(ty == 0)
+    res[blockIdx.y] = min_vals[0];
+
 }
 
-// REQUIRES : Array of tasks
+// REQUIRES : Array of tasks all of which are valid
 //            starting value of tasks
-//            number of tasks to count
+//            num < 2*BLOCKDIM_RED
 // MODIFIES : res
-// EFFECTS  : counts the total number of all tasks
-__global__ void countTasks(const Task *arr, const int start, const int num,
+// EFFECTS  : computes the number of valid tasks
+__global__ void countTasks(const Task* arr, const int start, const int num,
                           int* res)
 {
-  // int ty = threadIdx.y;
-  // int tid = threadIdx.x * blockDim.y + threadIdx.y;
+  // ASUMING blockDim.y == BLOCSIZE_RED
+  int ty = threadIdx.y;
+  int tid = blockIdx.y*2*BLOCKSIZE_RED + threadIdx.y;
 
-  *res = 0;
+  __shared__ int count_vals[2*BLOCKSIZE_RED];
+  int val1 = 0, val2 = 0;
+
+  int stepsize = BLOCKSIZE_RED;
+
+  if(tid < num && arr[start + tid].i1 >= 0)
+    count_vals[ty] = 1;
+  else
+    count_vals[ty] = 0;
+
+  if(tid + BLOCKSIZE_RED < num && arr[start + tid + BLOCKSIZE_RED].i1 >= 0)
+    count_vals[ty + BLOCKSIZE_RED] = 1;
+  else
+    count_vals[ty + BLOCKSIZE_RED] = 0;
+
+  __syncthreads();
+
+  while(stepsize > 0)
+  {
+    if(ty < stepsize)
+    {
+      val1 = count_vals[ty];
+      val2 = count_vals[ty + stepsize];
+
+      count_vals[ty] = val1 + val2;
+    }
+
+    stepsize = stepsize/2;
+    __syncthreads();
+  }
+
+  if(ty == 0)
+    res[blockIdx.y] = count_vals[0];
+
 }
 
 // REQUIRES : Two bounding volume heirarchy bvhA, bvhB
@@ -340,7 +410,7 @@ __global__ void addBFSTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
 
   int tx = threadIdx.x;
   int ty = threadIdx.y;
-  int tid = threadIdx.x * blockDim.y + threadIdx.y;
+  int tid = blockIdx.y * blockDim.y + threadIdx.y;
   float d_min = res->dist;
 
   __shared__ Task taskSetA[BFS_ROWS*BFS_COLS*2];
