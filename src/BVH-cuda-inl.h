@@ -113,6 +113,35 @@ __device__ __inline__ int isFull(const Queue* bvq) {
   return 0;
 }
 
+// REQUIRES : Array of tasks
+//            starting value of tasks
+//            number of tasks to reduce
+// MODIFIES : res
+// EFFECTS  : computes the minimum distance of all tasks
+__global__ void computeMin(const int start, const int num,
+                          float* res)
+{
+  // int ty = threadIdx.y;
+  int tid = threadIdx.x * blockDim.y + threadIdx.y;
+
+  if(tid == 0)
+    *res = 1;
+}
+
+// REQUIRES : Array of tasks
+//            starting value of tasks
+//            number of tasks to count
+// MODIFIES : res
+// EFFECTS  : counts the total number of all tasks
+__global__ void countTasks(const Task *arr, const int start, const int num,
+                          int* res)
+{
+  // int ty = threadIdx.y;
+  // int tid = threadIdx.x * blockDim.y + threadIdx.y;
+
+  *res = 0;
+}
+
 // REQUIRES : Two bounding volume heirarchy bvhA, bvhB
 //            Config for the computation
 //            Queue of leaf elements
