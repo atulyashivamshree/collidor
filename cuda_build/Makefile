@@ -20,6 +20,21 @@ test:
 	# cat block_puck_0.outp.csv
 	# ../build/compute_dist_bvh ../params/block_puck.yaml
 
+test_env_rob:
+	./dist_bvh.exe ../params/env_rob.yaml
+	rm env_rob_*.outp.csv
+	../build/compute_dist_bvh ../params/env_rob.yaml
+
+test_trumpet_cessna:
+	./dist_bvh.exe ../params/trumpet_cessna.yaml
+	rm trumpet_cessna_*.outp.csv
+	../build/compute_dist_bvh ../params/trumpet_cessna.yaml
+
+test_cessna_cessna:
+	./dist_bvh.exe ../params/cessna_cessna.yaml
+	rm cessna_cessna_*.outp.csv
+	../build/compute_dist_bvh ../params/cessna_cessna.yaml
+
 test_puck_puck:
 	./dist_bvh.exe ../params/puck_puck_t0.yaml
 	# cat puck_puck_0.outp.csv
@@ -47,6 +62,11 @@ test_block_puck_queue:
 	./dist_bvh.exe ../params/block_puck.yaml
 	../build/verify_dist ../params/block_puck.yaml
 	rm block_puck_*.outp.csv
+
+test_trumpet_cessna_queue:
+	./dist_bvh.exe ../params/trumpet_cessna.yaml
+	../build/verify_dist ../params/trumpet_cessna.yaml
+	# rm trumpet_cessna_*.outp.csv
 
 test_s1_s2_queue:
 	./dist_bvh.exe ../params/s1s2.yaml
