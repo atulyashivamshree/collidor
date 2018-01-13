@@ -15,10 +15,9 @@ LIB_DIRS = -L$(FCL_PATH)/build/lib
 all: dist_bvh
 
 test:
-	./dist_bvh.exe ../params/block_puck.yaml
-	# rm block_puck_*.outp.csv
-	# cat block_puck_0.outp.csv
-	# ../build/compute_dist_bvh ../params/block_puck.yaml
+	./dist_bvh.exe ../params/block_puck_t0.yaml
+	rm block_puck_*.outp.csv
+	../build/compute_dist_bvh ../params/block_puck_t0.yaml
 
 test_env_rob:
 	./dist_bvh.exe ../params/env_rob.yaml
