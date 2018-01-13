@@ -22,7 +22,7 @@
 #define BLOCKSIZE_BV 32
 #define BLOCKSIZE_LEAF 32
 #define BLOCKSIZE_TASKS_ADDER 32
-#define BLOCKSIZE_RED 1024
+#define BLOCKSIZE_RED 64
 #define MAX_BLOCKS_RED  8192/(2*BLOCKSIZE_RED)
 
 #define STOP_CONDITION_QUEUE_FULL 2
@@ -59,6 +59,7 @@ struct DistanceResult
 __device__ Set dfs_set;
 __device__ Set dfs_extra;
 __device__ Set leaf_tasks_dfs;
+__device__ float min_dist_red[MAX_BLOCKS_RED];
 
 // REQUIRES : A valid queue
 // MODIFIES : The queue structure
@@ -152,7 +153,7 @@ __global__ void computeMin(const Task* arr, const int start, const int num,
       val1 = min_vals[ty];
       val2 = min_vals[ty + stepsize];
 
-      min_vals[ty] = min(val1, val2);
+      min_vals[ty] = fminf(val1, val2);
     }
 
     stepsize = stepsize/2;
@@ -224,20 +225,23 @@ __global__ void countTasks(const Task* arr, const int start, const int num,
 //            num elements from leaf queue are extracted
 //            The result values are updated
 //            TODO : parallelize this over multiple threads
-__device__ void reduceLeafTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
+__global__ void reduceLeafTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
                           Queue *l_q, DistanceResult* res,
                           const int num)
 {
-  float d_min = res->dist;
-
-  // first check the leaf checks to search for potential minimas
-  for(int i = 0; i < num; i++)
+  if(threadIdx.y == 0 && blockIdx.y == 0)
   {
-    int arr_id = getIdFromQueue(l_q, 0);
-    d_min = fminf(d_min, l_q->arr[arr_id].dist);
-    removeNFromQueue(l_q, 1);
+    float d_min = res->dist;
+
+    // first check the leaf checks to search for potential minimas
+    for(int i = 0; i < num; i++)
+    {
+      int arr_id = getIdFromQueue(l_q, 0);
+      d_min = fminf(d_min, l_q->arr[arr_id].dist);
+      removeNFromQueue(l_q, 1);
+    }
+    res->dist = d_min;
   }
-  res->dist = d_min;
 }
 
 // REQUIRES : Two bounding volumes bvA, bvB
@@ -495,22 +499,15 @@ __global__ void addBFSTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
     }
   }
   __syncthreads();
-  if(tx == 0)
+  if(tid == 0)
   {
-    if(ty == 0)
-    {
-      tsize = 0;
-      lsize = 0;
-      // res->tsk2 = taskSetA[4];
-      // res->tsk.i1 = setLeaf_size[3];
-      // res->tsk.i2 = setLeaf_size[4];
-      // res->tsk.dist = setLeaf_size[5];
-      // res->tsk2.i1 = setA_size[3];
-      // res->tsk2.i2 = setA_size[4];
-      // res->tsk2.dist = setA_size[5];
-    }
-    
-    for(int i = 0; i < BFS_ROWS; i++)
+    tsize = 0;
+    lsize = 0;
+  }  
+
+  for(int i = 0; i < BFS_ROWS; i++)
+  {
+    if(tx == 0)
     {
       if(ty < setA_size[i])
         taskSetA[tsize + ty] = taskSetA_red[i*2*BFS_COLS + ty];
@@ -524,26 +521,19 @@ __global__ void addBFSTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
       if(ty + BFS_COLS < setLeaf_size[i])
         taskSetLeaf[lsize + ty+ BFS_COLS] = taskSetLeaf_red[i*2*BFS_COLS + ty+ BFS_COLS];
       
-      __syncthreads();
+    }
+    __syncthreads();
 
-      if(ty == 0)
-      {
-        tsize += setA_size[i];
-        lsize += setLeaf_size[i];
-      }
-    }
-    if(ty == 0)
+    if(tid == 0)
     {
-      res->idx = tsize;
-      res->idy = lsize;
-      // res->tsk2 = taskSetA[4];
-      // res->tsk.i1 = setLeaf_size[3];
-      // res->tsk.i2 = setLeaf_size[4];
-      // res->tsk.dist = setLeaf_size[5];
-      // res->tsk2.i1 = setA_size[3];
-      // res->tsk2.i2 = setA_size[4];
-      // res->tsk2.dist = setA_size[5];
+      tsize += setA_size[i];
+      lsize += setLeaf_size[i];
     }
+  }
+  if(tid == 0)
+  {
+    res->tsk.i1 = tsize;
+    res->tsk2.i1 = lsize;
   }
 
   __syncthreads();
@@ -574,6 +564,7 @@ __global__ void addBFSTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   {
     l_q->last += lsize;
     l_q->size += lsize;
+    res->idy += lsize;
   }
 }
 
@@ -651,6 +642,8 @@ __device__ void addBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   cudaStreamCreateWithFlags(&stream_dfs, cudaStreamNonBlocking);
   cudaStreamCreateWithFlags(&stream_bfs, cudaStreamNonBlocking);
 
+  res->idy = 0;
+
   // Evaluate BV only if stopping condition has not been met
   if(d_min > cfg->gamma)
   {
@@ -681,19 +674,20 @@ __device__ void addBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
     // TODO(run only if leaf tasks exist)
     dimBlockTasks.y = MAX_DFS_SET;
     dimBlockTasks.x = 1;
-    dimGridTasks.y = (leaf_set_size - 1)/MAX_DFS_SET + 1;
+    dimGridTasks.y = 1;
     transferDFSandBFSLeafs<<<dimGridTasks, dimBlockTasks>>>(l_q, leaf_set_size);
     // Assuming capacity to be really large
     cudaDeviceSynchronize();
     l_q->last += leaf_set_size;
     l_q->size += leaf_set_size;
+    res->idx = l_q->size;
 
     // ADD extra BV tasks from DFS to BFS queue
     int dfs_extra_size = dfs_extra.size;
     // TODO(run only if leaf tasks exist)
     dimBlockTasks.y = MAX_DFS_SET;
     dimBlockTasks.x = 1;
-    dimGridTasks.y = (dfs_extra_size - 1)/MAX_DFS_SET + 1;
+    dimGridTasks.y = 1;
     transferDFSandBFS<<<dimGridTasks, dimBlockTasks>>>(bv_q, dfs_extra_size, res);
     // Assuming capacity to be really large
     cudaDeviceSynchronize();
@@ -810,6 +804,8 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   // start of with the roots in the queue
   dfs_set.arr[0] = Task({0, 0, 1e37});
   dfs_set.size = 1;
+  dfs_extra.size = 0;
+  leaf_tasks_dfs.size = 0;
 
   initializeQueue(bv_queue);
   initializeQueue(l_queue);
@@ -822,8 +818,11 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   dim3 dimBlockLeaf(1, BLOCKSIZE_LEAF);
   dim3 dimGridLeaf(1,1);
 
-  int num_dfs_tasks;
-  int num_bfs_tasks;
+  dim3 dimBlockReduction(1, BLOCKSIZE_RED);
+  dim3 dimGridReduction(1,1);
+
+  int num_dfs_tasks = 0;
+  int num_bfs_tasks = 0;
 
   cudaStream_t stream_dfs, stream_bfs, stream_leaf;
   cudaStreamCreateWithFlags(&stream_dfs, cudaStreamNonBlocking);
@@ -876,10 +875,22 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
     cudaDeviceSynchronize();
 
     // REDUCE THE LEAF TREE DATA
-    if(cfg->enable_distance_reduction)
+    if(cfg->enable_distance_reduction && num_leaf_tasks)
     {
-      reduceLeafTasks(bvhA, bvhB, cfg, l_queue, result, num_leaf_tasks);
+      int qstart = l_queue->start;
+      float min_dist = 1e38;
+      dimGridReduction.y = (num_leaf_tasks - 1)/(2*BLOCKSIZE_RED) + 1;
+      computeMin<<<dimGridReduction, dimBlockReduction>>>(l_queue->arr, 
+                            qstart, num_leaf_tasks, min_dist_red);
       cudaDeviceSynchronize();
+
+      for(int i = 0; i < dimGridReduction.y; i++)
+        min_dist = fminf(min_dist_red[i], min_dist);
+      
+      result->dist = fminf(result->dist, min_dist);
+
+      l_queue->start += num_leaf_tasks;
+      l_queue->size -= num_leaf_tasks;
     }
 
     res = *result;
@@ -915,7 +926,7 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
 
 __host__ void printDebugInfo(DebugVar* arr, int size)
 {
-  cout << std::setprecision(4);
+  cout << std::setprecision(6);
   cout << "ITER, DFS_BV, TOTAL_BV, NUM_BV_PROC, NUM_TRI " << endl;
   for(int i = 0; i < size; i++)
   {

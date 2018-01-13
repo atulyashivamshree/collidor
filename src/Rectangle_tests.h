@@ -37,7 +37,7 @@ HOST_PREFIX void initializeGlobalMAT()
   MAT_RXZ45.v3 = Vector3({0, 1, 0});
 }
 
-RSS getRandomRSS()
+HOST_PREFIX RSS getRandomRSS()
 {
   float v[9];
   for(int i = 0; i < 9; i++)
@@ -64,7 +64,7 @@ RSS getRandomRSS()
   return obj;
 }
 
-fcl::RSS<float> getFCLRSS(RSS shp) {
+HOST_PREFIX fcl::RSS<float> getFCLRSS(RSS shp) {
   fcl::RSS<float> obj;
   obj.axis(0,0) = shp.axis.v1.x;
   obj.axis(1,0) = shp.axis.v1.y;
@@ -104,13 +104,13 @@ HOST_PREFIX float distRectangles_fcl(const float R[3][3], const float t[3], RSS 
   return distance(tf.linear(), tf.translation(),fcl_s1 , fcl_s2, &p, &q);
 }
 
-void print_Rectangle_stats()
+HOST_PREFIX void print_Rectangle_stats()
 {
   std::cout << "Size of RSS is: " << sizeof(RSS) << std::endl;
   std::cout << "Size Of DistRSSVars is: " << sizeof(DistRSSVars) << std::endl;
 }
 
-void test_rectangles_2D()
+HOST_PREFIX void test_rectangles_2D()
 {
   initializeGlobalMAT();
 
@@ -167,7 +167,7 @@ void test_rectangles_2D()
 
 }
 
-void test_rectangles_3D()
+HOST_PREFIX void test_rectangles_3D()
 {
   initializeGlobalMAT();
 
@@ -213,7 +213,7 @@ void test_rectangles_3D()
   std::cout << "Test Rectangles 3D : PASSED" << std::endl;
 }
 
-void test_RSS_2D()
+HOST_PREFIX void test_RSS_2D()
 {
   initializeGlobalMAT();
 
@@ -262,7 +262,7 @@ void test_RSS_2D()
 
 }
 
-void test_RSS_3D()
+HOST_PREFIX void test_RSS_3D()
 {
   initializeGlobalMAT();
 
@@ -308,7 +308,7 @@ void test_RSS_3D()
 }
 
 
-void test_stress_random_RSS()
+HOST_PREFIX void test_stress_random_RSS()
 {
   srand(static_cast<unsigned> (time(NULL)));
 

@@ -183,6 +183,9 @@ void distance_Test_Oriented(const fcl::Transform3<typename BV::S>& tf,
   m2.addSubModel(vertices2, triangles2);
   m2.endModel();
 
+  // START timer to measure the distance computation time
+  double t_start = get_wall_time();
+
   fcl::DistanceResult<S> local_result;
   TraversalNode node;
   if(!initialize(node, (const fcl::BVHModel<BV>&)m1, fcl::Transform3f::Identity(),
@@ -191,9 +194,6 @@ void distance_Test_Oriented(const fcl::Transform3<typename BV::S>& tf,
     std::cout << "initialize error" << std::endl;
 
   node.enable_statistics = verbose;
-
-  // START timer to measure the distance computation time
-  double t_start = get_wall_time();
 
   distance(&node, nullptr, qsize);
 

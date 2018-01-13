@@ -1,6 +1,7 @@
 CXX = nvcc
 
-CFLAGS = -g --std=c++11 --resource-usage -Werror cross-execution-space-call -arch=sm_35 -rdc=true -lcudadevrt
+DEBUG = -g -G
+CFLAGS = --std=c++11 --resource-usage -Werror cross-execution-space-call -arch=sm_35 -rdc=true -lcudadevrt
 
 SRC1 = ../src/test_triangles.cu
 SRC2 = ../src/test_rss.cu
