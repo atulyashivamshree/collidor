@@ -410,7 +410,7 @@ __global__ void addBFSTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
 
   int tx = threadIdx.x;
   int ty = threadIdx.y;
-  int tid = blockIdx.y * blockDim.y + threadIdx.y;
+  int tid = threadIdx.x * blockDim.y + threadIdx.y;
   float d_min = res->dist;
 
   __shared__ Task taskSetA[BFS_ROWS*BFS_COLS*2];
@@ -647,14 +647,18 @@ __device__ void addBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   dim3 dimBlockTasks(1,BLOCKSIZE_TASKS_ADDER);
   dim3 dimGridTasks(1,1);
 
+  cudaStream_t stream_dfs, stream_bfs;
+  cudaStreamCreateWithFlags(&stream_dfs, cudaStreamNonBlocking);
+  cudaStreamCreateWithFlags(&stream_bfs, cudaStreamNonBlocking);
+
   // Evaluate BV only if stopping condition has not been met
   if(d_min > cfg->gamma)
   {
     // PROCESS the DFS Set
     dimBlockTasks.y = MAX_DFS_SET;
     dimGridTasks.y = 1;
-    addDFSTasks<<<dimGridTasks, dimBlockTasks>>>(bvhA, bvhB, cfg, res);
-    cudaDeviceSynchronize();
+    addDFSTasks<<<dimGridTasks, dimBlockTasks, 0, stream_dfs>>>(bvhA, bvhB, cfg, res);
+    // cudaDeviceSynchronize();
 
     // ADD BFS tasks
     dimBlockTasks.y = BFS_COLS;
@@ -663,7 +667,7 @@ __device__ void addBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
     while(num_bfs_tasks > 0)
     {
       int num_tasks_run = min(num_bfs_tasks, BFS_ROWS * BFS_COLS);
-      addBFSTasks<<<dimGridTasks, dimBlockTasks>>>(bvhA, bvhB, cfg, 
+      addBFSTasks<<<dimGridTasks, dimBlockTasks, 0, stream_bfs>>>(bvhA, bvhB, cfg, 
                                                 bv_q, l_q, res, num_tasks_run);
       cudaDeviceSynchronize();
 
@@ -717,6 +721,8 @@ __device__ void addBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   {
     res->stop = STOP_CONDITION_BELOW_THRESH;
   }
+  cudaStreamDestroy(stream_dfs);
+  cudaStreamDestroy(stream_bfs);
 }
 
 // REQUIRES : Two bounding volume heirarchy bvhA, bvhB
@@ -752,10 +758,11 @@ __global__ void processBVTasksFromSet(const BVH* bvhA, const BVH* bvhB, const Co
 // EFFECTS  : Extract num BVs from the BV queue and evaluates them for pairwise 
 //            distance
 __global__ void processBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
-                             Queue* bv_q, const int num)
+                             Queue* bv_q, const int start,
+                             const int num)
 {
   int j = blockIdx.y * blockDim.y + threadIdx.y;
-  int arr_id = getIdFromQueue(bv_q, j);
+  int arr_id = start + j;
 
   if(j < num)
   {
@@ -818,6 +825,11 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   int num_dfs_tasks;
   int num_bfs_tasks;
 
+  cudaStream_t stream_dfs, stream_bfs, stream_leaf;
+  cudaStreamCreateWithFlags(&stream_dfs, cudaStreamNonBlocking);
+  cudaStreamCreateWithFlags(&stream_bfs, cudaStreamNonBlocking);
+  cudaStreamCreateWithFlags(&stream_leaf, cudaStreamNonBlocking);
+
   int i;
   for(i = 0; (i < cfg->max_iter) && (res.stop == 0); i++)
   {
@@ -826,8 +838,8 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
     dimGridBV.y = (num_dfs_tasks - 1)/BLOCKSIZE_BV + 1;
     if(num_dfs_tasks)
     {
-      processBVTasksFromSet<<<dimBlockBV, dimBlockBV>>>(bvhA, bvhB, cfg,
-                                                        num_dfs_tasks);
+      processBVTasksFromSet<<<dimBlockBV, dimBlockBV, 0, stream_dfs>>>
+                                          (bvhA, bvhB, cfg, num_dfs_tasks);
     }
 
     // PROCESS THE BV TREE NODE BFS TASKS
@@ -840,8 +852,9 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
     dimGridBV.y = (num_bfs_tasks - 1)/BLOCKSIZE_BV + 1;
     if(num_bfs_tasks)
     {
-      processBVTasks<<<dimGridBV, dimBlockBV>>>(bvhA, bvhB, cfg, bv_queue, 
-                                        num_bfs_tasks);
+      int start = bv_queue->start;
+      processBVTasks<<<dimGridBV, dimBlockBV, 0, stream_bfs>>>
+                      (bvhA, bvhB, cfg, bv_queue, start, num_bfs_tasks);
     }
     // cudaDeviceSynchronize();
 
@@ -851,8 +864,8 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
 
     if(num_leaf_tasks)
     {
-      processLeafTasks<<<dimGridLeaf, dimBlockLeaf>>>(bvhA, bvhB, cfg, l_queue, 
-                                        num_leaf_tasks);
+      processLeafTasks<<<dimGridLeaf, dimBlockLeaf, 0, stream_leaf>>>
+                            (bvhA, bvhB, cfg, l_queue, num_leaf_tasks);
     }
     cudaDeviceSynchronize();
 
@@ -893,6 +906,9 @@ __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   *result = res;
   
   result->num_iter = i;
+  cudaStreamDestroy(stream_dfs);
+  cudaStreamDestroy(stream_bfs);
+  cudaStreamDestroy(stream_leaf);
 
   // result->dist = bv_queue->arr[0].i1;
 }
