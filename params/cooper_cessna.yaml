@@ -1,0 +1,11 @@
+file1_obj: ../CAD/minicooper.obj
+file2_obj: ../CAD/cessna.obj
+file1_bvh: ../CAD/minicooper.bvh
+file2_bvh: ../CAD/cessna.bvh
+transforms: ../CAD/transforms_set3.csv
+outp_prefix: cooper_cessna
+gamma: 0.0001
+max_iter: 400
+max_bfs_proc: 1152
+max_dfs_proc: 64
+compute_min_dist: 1

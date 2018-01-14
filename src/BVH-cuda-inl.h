@@ -542,7 +542,6 @@ __global__ void addBFSTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   if(2*tid + 1 < tsize)
     bv_q->arr[last + 2*tid + 1] = taskSetA[2*tid + 1];
 
-  __syncthreads();
   if(tid == 0)
   { 
     // Assuming capacity to be really large
@@ -559,7 +558,6 @@ __global__ void addBFSTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
   if(2*tid + 1 < lsize)
     l_q->arr[last + 2*tid + 1] = taskSetLeaf[2*tid + 1];
 
-  __syncthreads();
   if(tid == 0)
   {
     l_q->last += lsize;
