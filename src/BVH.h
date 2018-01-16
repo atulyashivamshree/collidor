@@ -16,6 +16,7 @@
 #define MAX_DFS_SET 128
 #define BFS_ROWS 12
 #define BFS_COLS 32
+#define MAX_BFS_BLOCKS  16
 
 struct Task
 {
@@ -55,6 +56,13 @@ struct Set
   Task arr[MAX_DFS_SET];
   unsigned int size;
 };
+
+struct SetBFS
+{
+  Task arr[MAX_BFS_BLOCKS][BFS_COLS*BFS_ROWS*2];
+  unsigned int size[MAX_BFS_BLOCKS];
+};
+
 
 struct Config
 {

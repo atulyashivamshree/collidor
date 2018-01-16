@@ -16,9 +16,9 @@ LIB_DIRS = -L$(FCL_PATH)/build/lib
 all: dist_bvh
 
 test:
-	./dist_bvh.exe ../params/block_puck_t0.yaml
+	./dist_bvh.exe ../params/block_puck.yaml
 	rm block_puck_*.outp.csv
-	../build/compute_dist_bvh ../params/block_puck_t0.yaml
+	../build/compute_dist_bvh ../params/block_puck.yaml
 
 test_env_rob:
 	./dist_bvh.exe ../params/env_rob.yaml
@@ -36,12 +36,12 @@ test_cessna_cessna:
 	../build/compute_dist_bvh ../params/cessna_cessna.yaml
 
 test_puck_puck:
-	./dist_bvh.exe ../params/puck_puck_t0.yaml
+	./dist_bvh.exe ../params/puck_puck.yaml
 	# cat puck_puck_0.outp.csv
 	# echo "============"
 	# cat puck_puck_1.outp.csv
 	rm puck_puck_*.outp.csv
-	../build/compute_dist_bvh ../params/puck_puck_t0.yaml
+	../build/compute_dist_bvh ../params/puck_puck.yaml
 
 test_block_puck:
 	./dist_bvh.exe ../params/block_puck.yaml
@@ -49,19 +49,20 @@ test_block_puck:
 	../build/compute_dist_bvh ../params/block_puck.yaml
 
 test_block_s1:
-	./dist_bvh.exe ../params/block_s1_t0.yaml
+	./dist_bvh.exe ../params/block_s1.yaml
 	# rm block_s1_*.outp.csv
-	../build/compute_dist_bvh ../params/block_s1_t0.yaml
+	../build/compute_dist_bvh ../params/block_s1.yaml
 
 test_s1_s2:
-	./dist_bvh.exe ../params/s1s2_t0.yaml
+	./dist_bvh.exe ../params/s1s2.yaml
 	# rm s1s2_*.outp.csv
-	../build/compute_dist_bvh ../params/s1s2_t0.yaml
+	../build/compute_dist_bvh ../params/s1s2.yaml
 
 test_block_puck_queue:
 	./dist_bvh.exe ../params/block_puck.yaml
 	../build/verify_dist ../params/block_puck.yaml
-	rm block_puck_*.outp.csv
+	cat block_puck_0.outp.csv
+	# rm block_puck_*.outp.csv
 
 test_cooper_cessna_queue:
 	./dist_bvh.exe ../params/cooper_cessna.yaml
@@ -70,6 +71,7 @@ test_cooper_cessna_queue:
 
 test_s1_s2_queue:
 	./dist_bvh.exe ../params/s1s2.yaml
+	cat s1s2_0.outp.csv
 	../build/verify_dist ../params/s1s2.yaml
 	rm s1s2_*.outp.csv
 	

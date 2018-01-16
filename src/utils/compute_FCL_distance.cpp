@@ -27,6 +27,8 @@ using namespace fcl;
 #include "SampleObjects.h"
 #include "parse_utils.h"
 
+#define EPSILON 1e-5
+
 template <typename S>
 void test_mesh_distance(string file1, string file2,
 		vector<Transform3<S>> transforms,
@@ -101,7 +103,7 @@ void validateDistances(string gpu_outfile, vector<float> distances,
     tot_gpu_time += del_t;
     tot_cpu_time += cpu_time[i];
 
-		if(!approxEquals(distances[i], dist))
+		if(!approxEquals(distances[i], dist, max(EPSILON, EPSILON * distances[i])))
 		{
       count_inequality++;
       cout << "DIFF";

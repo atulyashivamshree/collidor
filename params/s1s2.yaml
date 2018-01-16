@@ -2,10 +2,10 @@ file1_obj: _
 file2_obj: _
 file1_bvh: ../CAD/sample1.bvh
 file2_bvh: ../CAD/sample2.bvh
-transforms: ../CAD/transforms_set2.csv
+transforms: ../CAD/transforms_set0.csv
 outp_prefix: s1s2
 gamma: 0.0001
-max_iter: 50
+max_iter: 5
 max_bfs_proc: 1
 max_dfs_proc: 1
 compute_min_dist: 1
