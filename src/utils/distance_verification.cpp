@@ -18,8 +18,9 @@
 
 #include "fcl/geometry/bvh/detail/BVH_front.h"
 #include "fcl/narrowphase/detail/traversal/collision_node.h"
+#include "fcl/narrowphase/detail/traversal/distance/mesh_distance_traversal_node.h"
 #include "fcl/narrowphase/detail/primitive_shape_algorithm/triangle_distance.h"
-#include "../test_fcl_utility.h"
+#include "test_fcl_utility.h"
 
 using namespace std;
 using namespace fcl;

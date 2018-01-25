@@ -18,7 +18,8 @@
 #include "Eigen/Dense"
 #include "fcl/geometry/bvh/detail/BVH_front.h"
 #include "fcl/narrowphase/detail/traversal/collision_node.h"
-#include "../test_fcl_utility.h"
+#include "fcl/narrowphase/detail/traversal/distance/mesh_distance_traversal_node.h"
+#include "test_fcl_utility.h"
 
 using namespace std;
 using namespace fcl;
@@ -103,7 +104,7 @@ void validateDistances(string gpu_outfile, vector<float> distances,
     tot_gpu_time += del_t;
     tot_cpu_time += cpu_time[i];
 
-		if(!approxEquals(distances[i], dist, max(EPSILON, EPSILON * distances[i])))
+		if(!approxEquals(distances[i], dist, fmax(EPSILON, EPSILON * distances[i])))
 		{
       count_inequality++;
       cout << "DIFF";

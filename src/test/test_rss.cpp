@@ -1,12 +1,12 @@
 #define FCL_EXPORT
-#include "compile_CPP.h"
+#include "../compile_CPP.h"
 #include <iostream>
 
 #define DIST_TRIANGLES distTriangles
-#include "Triangles_test.h"
+#include "../Triangles_test.h"
 
 #define DIST_RSS rssDistance
-#include "Rectangle_tests.h"
+#include "../Rectangle_tests.h"
 
 using namespace std;
 

@@ -1,6 +1,6 @@
-#include "compile_CPP.h"
+#include "../compile_CPP.h"
 
-#include "RSS.h"
+#include "../RSS.h"
 #include <iostream>
 #include <cstdlib>
 #include <Eigen/Dense>

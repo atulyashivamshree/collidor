@@ -14,7 +14,7 @@
 
 #include "fcl/geometry/bvh/detail/BVH_front.h"
 #include "fcl/narrowphase/detail/traversal/collision_node.h"
-#include "../test_fcl_utility.h"
+#include "test_fcl_utility.h"
 
 using namespace std;
 
