@@ -33,10 +33,14 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-/** @author Jia Pan */
+/** @author Jia Pan 
+    
+    MODIFIED BY Atulya Shivam Shree
+    Date : Dec 12, 2017
+    */
 
-#ifndef TEST_FCL_UTILITY_H
-#define TEST_FCL_UTILITY_H
+#ifndef SRC_UTILS_TEST_FCL_UTILITY_H_
+#define SRC_UTILS_TEST_FCL_UTILITY_H_
 
 #include <array>
 #include <fstream>
@@ -47,52 +51,34 @@
 #include "fcl/math/constants.h"
 #include "fcl/math/triangle.h"
 
-#include "fcl/geometry/shape/box.h"
-#include "fcl/geometry/shape/sphere.h"
-#include "fcl/geometry/shape/cylinder.h"
 #include "fcl/geometry/bvh/BVH_model.h"
-//#include "fcl/geometry/octree/octree.h"
+#include "fcl/geometry/shape/box.h"
+#include "fcl/geometry/shape/cylinder.h"
+#include "fcl/geometry/shape/sphere.h"
 
-//#include "fcl/narrowphase/collision.h"
-//#include "fcl/narrowphase/distance.h"
-//#include "fcl/narrowphase/collision_object.h"
-//#include "fcl/narrowphase/collision_result.h"
-//#include "fcl/narrowphase/continuous_collision_object.h"
-//#include "fcl/narrowphase/continuous_collision_request.h"
-//#include "fcl/narrowphase/continuous_collision_result.h"
+namespace fcl {
 
-#ifdef _WIN32
-#define NOMINMAX  // required to avoid compilation errors with Visual Studio 2010
-#include <windows.h>
-#else
-#include <sys/time.h>
-#endif
+namespace test {
 
-namespace fcl
-{
-
-namespace test
-{
-
-class Timer
-{
-public:
+class Timer {
+ public:
   Timer();
   ~Timer();
 
-  void start();                               ///< start timer
-  void stop();                                ///< stop the timer
-  double getElapsedTime();                    ///< get elapsed time in milli-second
-  double getElapsedTimeInSec();               ///< get elapsed time in second (same as getElapsedTime)
-  double getElapsedTimeInMilliSec();          ///< get elapsed time in milli-second
-  double getElapsedTimeInMicroSec();          ///< get elapsed time in micro-second
+  void start();                       ///< start timer
+  void stop();                        ///< stop the timer
+  double getElapsedTime();            ///< get elapsed time in milli-second
+  double getElapsedTimeInSec();       ///< get elapsed time in second (same as
+                                      ///< getElapsedTime)
+  double getElapsedTimeInMilliSec();  ///< get elapsed time in milli-second
+  double getElapsedTimeInMicroSec();  ///< get elapsed time in micro-second
 
-private:
-  double startTimeInMicroSec;                 ///< starting time in micro-second
-  double endTimeInMicroSec;                   ///< ending time in micro-second
-  int stopped;                                ///< stop flag
+ private:
+  double startTimeInMicroSec;  ///< starting time in micro-second
+  double endTimeInMicroSec;    ///< ending time in micro-second
+  int stopped;                 ///< stop flag
 #ifdef _WIN32
-  LARGE_INTEGER frequency;                    ///< ticks per second
+  LARGE_INTEGER frequency;  ///< ticks per second
   LARGE_INTEGER startCount;
   LARGE_INTEGER endCount;
 #else
@@ -101,15 +87,13 @@ private:
 #endif
 };
 
-struct TStruct
-{
+struct TStruct {
   std::vector<double> records;
   double overall_time;
 
   TStruct() { overall_time = 0; }
 
-  void push_back(double t)
-  {
+  void push_back(double t) {
     records.push_back(t);
     overall_time += t;
   }
@@ -117,29 +101,27 @@ struct TStruct
 
 /// @brief Load an obj mesh file
 template <typename S>
-void loadOBJFile(const char* filename, std::vector<Vector3<S>>& points, std::vector<Triangle>& triangles);
+void loadOBJFile(const char* filename, std::vector<Vector3<S>>& points,
+                 std::vector<Triangle>& triangles);
 
 template <typename S>
-void saveOBJFile(const char* filename, std::vector<Vector3<S>>& points, std::vector<Triangle>& triangles);
+void saveOBJFile(const char* filename, std::vector<Vector3<S>>& points,
+                 std::vector<Triangle>& triangles);
 
-/// @brief Structure for minimum distance between two meshes and the corresponding nearest point pair
+/// @brief Structure for minimum distance between two meshes and the
+/// corresponding nearest point pair
 template <typename S>
-struct DistanceRes
-{
+struct DistanceRes {
   S distance;
   Vector3<S> p1;
   Vector3<S> p2;
 };
 
-
-/// @brief Distance data stores the distance request and the result given by distance algorithm.
+/// @brief Distance data stores the distance request and the result given by
+/// distance algorithm.
 template <typename S>
-struct DistanceData
-{
-  DistanceData()
-  {
-    done = false;
-  }
+struct DistanceData {
+  DistanceData() { done = false; }
 
   /// @brief Distance request
   DistanceRequest<S> request;
@@ -149,10 +131,7 @@ struct DistanceData
 
   /// @brief Whether the distance iteration can stop
   bool done;
-
 };
-
-
 
 //============================================================================//
 //                                                                            //
@@ -162,12 +141,10 @@ struct DistanceData
 
 //==============================================================================
 template <typename S>
-void loadOBJFile(const char* filename, std::vector<Vector3<S>>& points, std::vector<Triangle>& triangles)
-{
-
+void loadOBJFile(const char* filename, std::vector<Vector3<S>>& points,
+                 std::vector<Triangle>& triangles) {
   FILE* file = fopen(filename, "rb");
-  if(!file)
-  {
+  if (!file) {
     std::cerr << "file not exist" << std::endl;
     return;
   }
@@ -175,64 +152,46 @@ void loadOBJFile(const char* filename, std::vector<Vector3<S>>& points, std::vec
   bool has_normal = false;
   bool has_texture = false;
   char line_buffer[2000];
-  while(fgets(line_buffer, 2000, file))
-  {
+  while (fgets(line_buffer, 2000, file)) {
     char* first_token = strtok(line_buffer, "\r\n\t ");
-    if(!first_token || first_token[0] == '#' || first_token[0] == 0)
-      continue;
+    if (!first_token || first_token[0] == '#' || first_token[0] == 0) continue;
 
-    switch(first_token[0])
-    {
-    case 'v':
-      {
-        if(first_token[1] == 'n')
-        {
+    switch (first_token[0]) {
+      case 'v': {
+        if (first_token[1] == 'n') {
           strtok(nullptr, "\t ");
           strtok(nullptr, "\t ");
           strtok(nullptr, "\t ");
           has_normal = true;
-        }
-        else if(first_token[1] == 't')
-        {
+        } else if (first_token[1] == 't') {
           strtok(nullptr, "\t ");
           strtok(nullptr, "\t ");
           has_texture = true;
-        }
-        else
-        {
+        } else {
           S x = (S)atof(strtok(nullptr, "\t "));
           S y = (S)atof(strtok(nullptr, "\t "));
           S z = (S)atof(strtok(nullptr, "\t "));
           points.emplace_back(x, y, z);
         }
-      }
-      break;
-    case 'f':
-      {
+      } break;
+      case 'f': {
         Triangle tri;
         char* data[30];
         int n = 0;
-        while((data[n] = strtok(nullptr, "\t \r\n")) != nullptr)
-        {
-          if(strlen(data[n]))
-            n++;
+        while ((data[n] = strtok(nullptr, "\t \r\n")) != nullptr) {
+          if (strlen(data[n])) n++;
         }
 
-        for(int t = 0; t < (n - 2); ++t)
-        {
-          if((!has_texture) && (!has_normal))
-          {
+        for (int t = 0; t < (n - 2); ++t) {
+          if ((!has_texture) && (!has_normal)) {
             tri[0] = atoi(data[0]) - 1;
             tri[1] = atoi(data[1]) - 1;
             tri[2] = atoi(data[2]) - 1;
-          }
-          else
-          {
-            const char *v1;
-            for(int i = 0; i < 3; i++)
-            {
+          } else {
+            const char* v1;
+            for (int i = 0; i < 3; i++) {
               // vertex ID
-              if(i == 0)
+              if (i == 0)
                 v1 = data[0];
               else
                 v1 = data[t + i];
@@ -249,29 +208,28 @@ void loadOBJFile(const char* filename, std::vector<Vector3<S>>& points, std::vec
 
 //==============================================================================
 template <typename S>
-void saveOBJFile(const char* filename, std::vector<Vector3<S>>& points, std::vector<Triangle>& triangles)
-{
+void saveOBJFile(const char* filename, std::vector<Vector3<S>>& points,
+                 std::vector<Triangle>& triangles) {
   std::ofstream os(filename);
-  if(!os)
-  {
+  if (!os) {
     std::cerr << "file not exist" << std::endl;
     return;
   }
 
-  for(std::size_t i = 0; i < points.size(); ++i)
-  {
-    os << "v " << points[i][0] << " " << points[i][1] << " " << points[i][2] << std::endl;
+  for (std::size_t i = 0; i < points.size(); ++i) {
+    os << "v " << points[i][0] << " " << points[i][1] << " " << points[i][2]
+       << std::endl;
   }
 
-  for(std::size_t i = 0; i < triangles.size(); ++i)
-  {
-    os << "f " << triangles[i][0] + 1 << " " << triangles[i][1] + 1 << " " << triangles[i][2] + 1 << std::endl;
+  for (std::size_t i = 0; i < triangles.size(); ++i) {
+    os << "f " << triangles[i][0] + 1 << " " << triangles[i][1] + 1 << " "
+       << triangles[i][2] + 1 << std::endl;
   }
 
   os.close();
 }
 
-} // namespace test
-} // namespace fcl
+}  // namespace test
+}  // namespace fcl
 
-#endif
+#endif  // SRC_UTILS_TEST_FCL_UTILITY_H_

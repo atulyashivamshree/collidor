@@ -1,6 +1,14 @@
+/*
+ *  test_rss.cpp
+    Description: Checks the working of RSS on the CPU
+
+    @author Atulya Shivam Shree
+    Created on: Dec 12, 2017
+    Copyright (c) 2017 Atulya Shivam Shree
+ */
 #define FCL_EXPORT
-#include "../compile_CPP.h"
 #include <iostream>
+#include "../utils/compile_CPP.h"
 
 #define DIST_TRIANGLES distTriangles
 #include "../Triangles_test.h"
@@ -8,10 +16,10 @@
 #define DIST_RSS rssDistance
 #include "../Rectangle_tests.h"
 
-using namespace std;
+using std::cout;
+using std::endl;
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
   // call all test functions
   test_triangles_2D();
   test_triangles_3D();

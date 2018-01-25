@@ -3,22 +3,20 @@ CXX = nvcc
 DEBUG = -g -G
 CFLAGS = --std=c++11 --resource-usage -Werror cross-execution-space-call -arch=sm_35 -rdc=true -lcudadevrt
 
-SRC1 = ../src/test_triangles.cu
 SRC2 = ../src/test_rss.cu
 SRC3 = ../src/dist_bvh.cu
 SRC4 = ../src/BVH-cuda-inl.h
 SRC5 = ../src/test_bvh.cu
 
-FCL_PATH = /home/atulya/Documents/eecs587/fcl
+FCL_PATH = /home/atulya/eecs587/fcl
 INCLUDE_DIRS = -I/usr/include/eigen3 -I$(FCL_PATH)/build/include -I${FCL_PATH}/include
 LIB_DIRS = -L$(FCL_PATH)/build/lib
 
 all: dist_bvh
 
 test:
-	./dist_bvh.exe ../params/block_puck.yaml
-	rm block_puck_*.outp.csv
-	../build/compute_dist_bvh ../params/block_puck.yaml
+	test_bvh_basics
+	test_puck_puck
 
 test_env_rob:
 	./dist_bvh.exe ../params/env_rob.yaml
@@ -85,10 +83,6 @@ dist_bvh: $(SRC3) $(SRC4)
 test_bvh_basics: $(SRC5)
 	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) $(SRC5) -o test_bvh.exe
 	./test_bvh.exe ../CAD/tasks0.csv
-
-test_triangles:
-	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) $(SRC1) -o test_triangles.exe
-	./test_triangles.exe
 
 test_rss:
 	$(CXX) $(CFLAGS) $(INCLUDE_DIRS) $(SRC2) -o test_rss.exe

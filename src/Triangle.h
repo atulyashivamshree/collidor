@@ -1,11 +1,20 @@
-#include "vector_math.h"
+/*
+ *  Tringle.h
+    Description: Declarations for the Triangle data structure
 
-#ifndef COLLIDOR_SRC_TRIANGLE
-#define COLLIDOR_SRC_TRIANGLE
+    @author Atulya Shivam Shree
+    Created on: Dec 11, 2017
+    Copyright (c) 2017 Atulya Shivam Shree
+ */
+
+
+#include "./vector_math.h"
+
+#ifndef SRC_TRIANGLE_H_
+#define SRC_TRIANGLE_H_
 
 // holds a triangle in 3D space
-struct Triangle
-{
+struct Triangle {
   Vector3 a;
   Vector3 b;
   Vector3 c;
@@ -13,24 +22,21 @@ struct Triangle
 
 // stores temporary vals for triangle distance computation
 
-struct LineSegVars
-{
+struct LineSegVars {
   float T[3], A_dot_A, B_dot_B, A_dot_B, A_dot_T, B_dot_T;
 
   float TMP[3];
 
-  float t,u;
+  float t, u;
 
   float denom;
 };
 
-struct TriangleResult
-{
+struct TriangleResult {
   float dist;
 };
 
-struct TriDistVars
-{
+struct TriDistVars {
   float Sv[3][3];
   float Tv[3][3];
 
@@ -61,8 +67,7 @@ struct TriDistVars
   LineSegVars line_seg_vars;
 };
 
-struct DistTriangleVars
-{
+struct DistTriangleVars {
   float S[3][3];
   float T[3][3];
 
@@ -72,13 +77,16 @@ struct DistTriangleVars
   TriDistVars tri_dist_vars;
 };
 
-CUDA_PREFIX INLINE_PREFIX float distTriangles(const Triangle* s1, const Triangle *s2,
-                        DistTriangleVars* p_var);
+CUDA_PREFIX INLINE_PREFIX float distTriangles(const Triangle* s1,
+                                              const Triangle* s2,
+                                              DistTriangleVars* p_var);
 
-CUDA_PREFIX INLINE_PREFIX float distTriangles(const Triangle* s1, const Triangle *s2,
-						const float R[3][3], const float t[3],
-                        DistTriangleVars* p_var);
+CUDA_PREFIX INLINE_PREFIX float distTriangles(const Triangle* s1,
+                                              const Triangle* s2,
+                                              const float R[3][3],
+                                              const float t[3],
+                                              DistTriangleVars* p_var);
 
 #include "Triangle-inl.h"
 
-#endif
+#endif  // SRC_TRIANGLE_H_

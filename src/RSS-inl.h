@@ -1,6 +1,17 @@
-CUDA_PREFIX void transformPoints(const float R[3][3], const float t[3], 
-                                      const RSS *a, float rot_v[4][3])
-{
+/*
+ *  BVH.h
+    Description: Describes the basic structure of a BVH
+
+    @author Atulya Shivam Shree
+    Created on: Dec 11, 2017
+    Copyright (c) 2017 Atulya Shivam Shree
+ */
+
+#ifndef SRC_RSS_INL_H_
+#define SRC_RSS_INL_H_
+
+CUDA_PREFIX void transformPoints(const float R[3][3], const float t[3],
+                                 const RSS* a, float rot_v[4][3]) {
   float n1[3] = {a->axis.v1.x, a->axis.v1.y, a->axis.v1.z};
   float n2[3] = {a->axis.v2.x, a->axis.v2.y, a->axis.v2.z};
   float l[2] = {a->l[0], a->l[1]};
@@ -27,8 +38,7 @@ CUDA_PREFIX void transformPoints(const float R[3][3], const float t[3],
   VmV(rot_v[3], rot_v[3], rot_v[0]);
 }
 
-CUDA_PREFIX void getPoints(const RSS *a, float v[4][3])
-{
+CUDA_PREFIX void getPoints(const RSS* a, float v[4][3]) {
   float n1[3] = {a->axis.v1.x, a->axis.v1.y, a->axis.v1.z};
   float n2[3] = {a->axis.v2.x, a->axis.v2.y, a->axis.v2.z};
   float l[2] = {a->l[0], a->l[1]};
@@ -49,9 +59,9 @@ CUDA_PREFIX void getPoints(const RSS *a, float v[4][3])
   VmV(v[3], v[3], v[0]);
 }
 
-CUDA_PREFIX INLINE_PREFIX void initTriangle(Triangle* tri, 
-            const float v0[3], const float v1[3], const float v2[3])
-{
+CUDA_PREFIX INLINE_PREFIX void initTriangle(Triangle* tri, const float v0[3],
+                                            const float v1[3],
+                                            const float v2[3]) {
   tri->a.x = v0[0];
   tri->a.y = v0[1];
   tri->a.z = v0[2];
@@ -64,8 +74,7 @@ CUDA_PREFIX INLINE_PREFIX void initTriangle(Triangle* tri,
 }
 
 CUDA_PREFIX float rssDistance(const float R[3][3], const float t[3],
-						const RSS* a, const RSS* b, DistRSSVars* p_var)
-{
+                              const RSS* a, const RSS* b, DistRSSVars* p_var) {
   float vert_a[4][3];
   float vert_b[4][3];
 
@@ -90,5 +99,7 @@ CUDA_PREFIX float rssDistance(const float R[3][3], const float t[3],
   min_d = min_d - (a->r + b->r);
   min_d = fmaxf(min_d, 0);
 
-	return min_d;
+  return min_d;
 }
+
+#endif  // SRC_RSS_INL_H_

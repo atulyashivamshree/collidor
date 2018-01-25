@@ -1,33 +1,28 @@
-#ifndef COLLIDOR_SRC_VECTOR_MATH_H_
-#define COLLIDOR_SRC_VECTOR_MATH_H_
+/*
+ *  vector_math-inl.h
+    Description: Describes the basic data structures for math
 
-struct Vector3
-{
+    @author Atulya Shivam Shree
+    Created on: Dec 11, 2017
+    Copyright (c) 2017 Atulya Shivam Shree
+    TODO(atulya) : remove this file if no longer required
+ */
+
+#ifndef SRC_VECTOR_MATH_H_
+#define SRC_VECTOR_MATH_H_
+
+struct Vector3 {
   float x;
   float y;
   float z;
 };
 
-struct Matrix3
-{
+struct Matrix3 {
   Vector3 v1;
   Vector3 v2;
   Vector3 v3;
 };
 
-CUDA_PREFIX void add(const Vector3* a, const Vector3* b, Vector3* c);
-
-CUDA_PREFIX void sub(const Vector3* a, const Vector3* b, Vector3* c);
-
-CUDA_PREFIX float dot(const Vector3* a, const Vector3* b);
-
-CUDA_PREFIX void cross(const Vector3* a, const Vector3* b, Vector3* c);
-
-CUDA_PREFIX void mult(const Matrix3* a, const Vector3* b, Vector3* c);
-
-CUDA_PREFIX void transform(const Matrix3* R, const Vector3* b, 
-                                const Vector3* x, Vector3* y);
-
 #include "vector_math-inl.h"
 
-#endif
+#endif  // SRC_VECTOR_MATH_H_
