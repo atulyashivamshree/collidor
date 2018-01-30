@@ -111,6 +111,8 @@ HOST_PREFIX float distRectangles_fcl(const float R[3][3], const float t[3],
   tf(2, 2) = R[2][2];
   tf(2, 3) = t[2];
 
+  // return 3;
+  // return distance(tf.linear(), tf.translation(), fcl_s1, fcl_s2, &p, &q);
   return distance(tf.linear(), tf.translation(), fcl_s1, fcl_s2, &p, &q);
 }
 
@@ -339,9 +341,21 @@ HOST_PREFIX void test_stress_random_RSS() {
     RSS r1 = getRandomRSS();
     RSS r2 = getRandomRSS();
 
-    Eigen::Vector3f angles = Eigen::Vector3f::Random();
-    Eigen::Vector3f pos = Eigen::Vector3f::Random();
+    Eigen::Vector3f angles;
+    Eigen::Vector3f pos;
 
+    for (int i = 0; i < 3; i++)
+    {
+      angles(i) = -3.1 + static_cast<float>(rand()) /
+                           static_cast<float>(RAND_MAX) * 6.2;
+      pos(i) = SPACE_LOW + static_cast<float>(rand()) /
+                           static_cast<float>(RAND_MAX) * 
+                           (SPACE_HIGH - SPACE_LOW);
+    }
+                           
+    // Eigen::Vector3f angles = Eigen::Vector3f::Random();
+    // Eigen::Vector3f pos = Eigen::Vector3f::Random();
+    
     Eigen::AngleAxisf rollAngle(angles(0), Eigen::Vector3f::UnitZ());
     Eigen::AngleAxisf yawAngle(angles(1), Eigen::Vector3f::UnitY());
     Eigen::AngleAxisf pitchAngle(angles(2), Eigen::Vector3f::UnitX());

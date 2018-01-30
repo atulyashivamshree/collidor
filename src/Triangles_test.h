@@ -22,7 +22,7 @@ using std::endl;
 
 const float SPACE_LOW = -1.0;
 const float SPACE_HIGH = 1.0;
-const int NUM_CHECK = 100;
+const int NUM_CHECK = 10000;
 const int STRESS_CHECK = 10000;
 const float EPSILON = 5e-5;
 

@@ -16,8 +16,8 @@ target_link_libraries(save_to_bvh fcl ccd)
 add_executable(compute_dist_bvh utils/compute_FCL_distance.cpp)
 target_link_libraries(compute_dist_bvh fcl ccd)
 
-add_executable(verify_dist utils/distance_verification.cpp)
-target_link_libraries(verify_dist fcl ccd)
+add_executable(verify_qdist utils/queue_verification.cpp)
+target_link_libraries(verify_qdist fcl ccd)
 
 add_executable(test_vector test/test_vector_math.cpp)
 add_executable(test_rss test/test_rss.cpp)

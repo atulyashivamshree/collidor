@@ -12,51 +12,53 @@
 
 const int BLOCKSIZE_RECT = 32;
 
-__device__ void computeDistance(const RSS* r1, const RSS* d2,
+__device__ void computeDistance(const RSS* r1, const RSS* r2,
                                 const float R[3][3], const float t[3],
                                 RSSResult* res) {
   float loc_R[3][3];
   float loc_t[3];
   RSS loc_r1;
-  RSS loc_d2;
+  RSS loc_r2;
   DistRSSVars vars;
 
   deepCopy3x3(loc_R, R);
   deepCopy3x1(loc_t, t);
 
   loc_r1 = *r1;
-  loc_d2 = *d2;
-  // res->dist = 1e-6 + distRSSs(r1, d2, &vars);
-  float dist = rssDistance(loc_R, loc_t, &loc_r1, &loc_d2, &vars);
+  loc_r2 = *r2;
+  // res->dist = 1e-6 + distRSSs(r1, r2, &vars);
+  float dist = rssDistance(loc_R, loc_t, &loc_r1, &loc_r2, &vars);
   res->dist = dist;
 }
 
 
-__global__ void computeDistanceArray(const Matrix3* R, const Vector3* t,
-                                     const RSS* arr_r1, const RSS* arr_d2,
-                                     RSSResult* arr_res, int n) {
-  int t_j = threadIdx.y;
+__global__ void computeDistanceSingle(const RSS* r1, const RSS* r2,
+                                const Config* cfg,
+                                RSSResult* res)
+{
+  float loc_R[3][3];
+  float loc_t[3];
+
+  deepCopy3x3(loc_R, cfg->R);
+  deepCopy3x1(loc_t, cfg->t);
+
+  computeDistance(r1, r2, loc_R, loc_t, res);
+}
+
+__global__ void computeDistanceArray(const RSS* arr_r1, const RSS* arr_r2,
+                                const Config* cfg,
+                                RSSResult* arr_res, int n) {
+
   int g_j = blockIdx.y * blockDim.y + threadIdx.y;
 
-  __shared__ float loc_R[3][3];
-  __shared__ float loc_t[3];
-  __shared__ RSS r1[BLOCKSIZE_RECT];
-  __shared__ RSS d2[BLOCKSIZE_RECT];
-  __shared__ DistRSSVars vars[BLOCKSIZE_RECT];
+  float loc_R[3][3];
+  float loc_t[3];
 
-  if (threadIdx.y == 0) {
-    // deepCopy3x3(loc_R, R);
-    // deepCopy3x1(loc_t, t);
-    // loc_R = *R;
-    // loc_t = *t;
-  }
+  deepCopy3x3(loc_R, cfg->R);
+  deepCopy3x1(loc_t, cfg->t);
 
   if (g_j < n) {
-    r1[t_j] = arr_r1[g_j];
-    d2[t_j] = arr_d2[g_j];
-    // res->dist = 1e-6 + distRSSs(r1, d2, &vars);
-    float dist = rssDistance(loc_R, loc_t, &r1[t_j], &d2[t_j], &vars[t_j]);
-    arr_res[g_j].dist = dist;
+    computeDistance(arr_r1 + g_j, arr_r2 + g_j, loc_R, loc_t, arr_res + g_j);
   }
 }
 

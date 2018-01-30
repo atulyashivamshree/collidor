@@ -1,7 +1,7 @@
 /*
- * 	distance_verification.cpp
+ * 	queue_verification.cpp
  *  @Desc: verifies whether the distances computed by GPU between primitive
-    triangle elements is same as that computed by the fcl library
+    triangle elements  in a queue is same as that computed by the fcl library
  *
  *  Created on: Dec 11, 2017
  *      Author: atulya

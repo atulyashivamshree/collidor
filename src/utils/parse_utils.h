@@ -13,6 +13,7 @@
 using std::map;
 using std::string;
 using std::vector;
+using Transform3f = Eigen::Transform<float, 3, Eigen::AffineCompact>;
 
 // REQUIRES : filename of the transformations file
 // MODIFIES : the vector of transforms

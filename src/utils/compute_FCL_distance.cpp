@@ -31,6 +31,7 @@ using std::vector;
 
 using fcl::Transform3;
 using fcl::Triangle;
+using fcl::RSSf;
 
 #include "SampleObjects.h"
 #include "compile_CPP.h"
@@ -40,17 +41,14 @@ using fcl::Triangle;
 
 template <typename S>
 void test_mesh_distance(string file1, string file2,
-                        vector<Transform3<S>> transforms, vector<S>& distance,
+                        vector<Transform3f> transforms, vector<S>& distance,
                         vector<float>& elap_time);
 
 template <typename BV, typename TraversalNode>
 void distance_Test_Oriented(
     const fcl::Transform3<typename BV::S>& tf,
-    const std::vector<fcl::Vector3<typename BV::S>>& vertices1,
-    const std::vector<Triangle>& triangles1,
-    const std::vector<fcl::Vector3<typename BV::S>>& vertices2,
-    const std::vector<Triangle>& triangles2,
-    fcl::detail::SplitMethodType split_method, int qsize,
+    fcl::BVHModel<BV> &m1, fcl::BVHModel<BV> &m2,
+    int qsize,
     fcl::test::DistanceRes<typename BV::S>& distance_result,
     vector<float>& elap_time, bool verbose);
 
@@ -133,10 +131,10 @@ void help_message() {
 
 template <typename S>
 void test_mesh_distance(string file1, string file2,
-                        vector<Transform3<S>> transforms, vector<S>& distance,
+                        vector<Transform3f> transforms, vector<S>& distance,
                         vector<float>& elap_time) {
   // LOAD the two OBJ files or the default versions of the files
-  std::vector<fcl::Vector3<S>> p1, p2;
+  std::vector<fcl::Vector3f> p1, p2;
   std::vector<fcl::Triangle> t1, t2;
 
   if (file1 == "_")
@@ -149,13 +147,26 @@ void test_mesh_distance(string file1, string file2,
   else
     fcl::test::loadOBJFile(file2.c_str(), p2, t2);
 
+  fcl::BVHModel<RSSf> m1;
+  fcl::BVHModel<RSSf> m2;
+  m1.bv_splitter.reset(new fcl::detail::BVSplitter<RSSf>(fcl::detail::SPLIT_METHOD_MEAN));
+  m2.bv_splitter.reset(new fcl::detail::BVSplitter<RSSf>(fcl::detail::SPLIT_METHOD_MEAN));
+
+  m1.beginModel();
+  m1.addSubModel(p1, t1);
+  m1.endModel();
+
+  m2.beginModel();
+  m2.addSubModel(p2, t2);
+  m2.endModel();
+
   // RUN the distance computation tests on all the different transforms for the
   // two objects
   fcl::test::DistanceRes<S> res, res_now;
   for (std::size_t i = 0; i < transforms.size(); ++i) {
     distance_Test_Oriented<fcl::RSS<S>,
                            fcl::detail::MeshDistanceTraversalNodeRSS<S>>(
-        transforms[i], p1, t1, p2, t2, fcl::detail::SPLIT_METHOD_MEAN, 2, res,
+        transforms[i], m1, m2, 2, res,
         elap_time, false);
     distance.push_back(res.distance);
   }
@@ -164,27 +175,11 @@ void test_mesh_distance(string file1, string file2,
 template <typename BV, typename TraversalNode>
 void distance_Test_Oriented(
     const fcl::Transform3<typename BV::S>& tf,
-    const std::vector<fcl::Vector3<typename BV::S>>& vertices1,
-    const std::vector<Triangle>& triangles1,
-    const std::vector<fcl::Vector3<typename BV::S>>& vertices2,
-    const std::vector<Triangle>& triangles2,
-    fcl::detail::SplitMethodType split_method, int qsize,
+    fcl::BVHModel<BV> &m1, fcl::BVHModel<BV> &m2,
+    int qsize,
     fcl::test::DistanceRes<typename BV::S>& distance_result,
     vector<float>& elap_time, bool verbose) {
   using S = typename BV::S;
-
-  fcl::BVHModel<BV> m1;
-  fcl::BVHModel<BV> m2;
-  m1.bv_splitter.reset(new fcl::detail::BVSplitter<BV>(split_method));
-  m2.bv_splitter.reset(new fcl::detail::BVSplitter<BV>(split_method));
-
-  m1.beginModel();
-  m1.addSubModel(vertices1, triangles1);
-  m1.endModel();
-
-  m2.beginModel();
-  m2.addSubModel(vertices2, triangles2);
-  m2.endModel();
 
   // START timer to measure the distance computation time
   double t_start = get_wall_time();
@@ -205,8 +200,8 @@ void distance_Test_Oriented(
   elap_time.push_back(get_wall_time() - t_start);
 
   // points are in local coordinate, to global coordinate
-  fcl::Vector3<S> p1 = local_result.nearest_points[0];
-  fcl::Vector3<S> p2 = local_result.nearest_points[1];
+  fcl::Vector3f p1 = local_result.nearest_points[0];
+  fcl::Vector3f p2 = local_result.nearest_points[1];
 
   distance_result.distance = local_result.min_distance;
   distance_result.p1 = p1;

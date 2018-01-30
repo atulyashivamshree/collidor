@@ -1,12 +1,12 @@
 CXX = nvcc
 
 DEBUG = -g -G
-CFLAGS = --std=c++11 --resource-usage -Werror cross-execution-space-call -arch=sm_35 -rdc=true -lcudadevrt
+CFLAGS = --std=c++11 --resource-usage -arch=sm_35 -rdc=true -lcudadevrt --expt-relaxed-constexpr
 
-SRC2 = ../src/test_rss.cu
+SRC2 = ../src/test/test_rss.cu
 SRC3 = ../src/dist_bvh.cu
 SRC4 = ../src/BVH-cuda-inl.h
-SRC5 = ../src/test_bvh.cu
+SRC5 = ../src/test/test_bvh.cu
 
 FCL_PATH = /home/atulya/eecs587/fcl
 INCLUDE_DIRS = -I/usr/include/eigen3 -I$(FCL_PATH)/build/include -I${FCL_PATH}/include
@@ -58,19 +58,19 @@ test_s1_s2:
 
 test_block_puck_queue:
 	./dist_bvh.exe ../params/block_puck.yaml
-	../build/verify_dist ../params/block_puck.yaml
+	../build/verify_qdist ../params/block_puck.yaml
 	cat block_puck_0.outp.csv
 	# rm block_puck_*.outp.csv
 
 test_cooper_cessna_queue:
 	./dist_bvh.exe ../params/cooper_cessna.yaml
-	../build/verify_dist ../params/cooper_cessna.yaml
+	../build/verify_qdist ../params/cooper_cessna.yaml
 	# rm trumpet_cessna_*.outp.csv
 
 test_s1_s2_queue:
 	./dist_bvh.exe ../params/s1s2.yaml
 	cat s1s2_0.outp.csv
-	../build/verify_dist ../params/s1s2.yaml
+	../build/verify_qdist ../params/s1s2.yaml
 	rm s1s2_*.outp.csv
 	
 clean:

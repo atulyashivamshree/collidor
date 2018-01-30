@@ -8,7 +8,7 @@
     Copyright (c) 2017 Atulya Shivam Shree
  */
 
-#include "compile_CUDA.h"
+#include "../compile_CUDA.h"
 
 #include <cassert>
 #include <fstream>
@@ -17,8 +17,8 @@
 #include <map>
 #include <string>
 
-#include "BVH-cuda-inl.h"
-#include "utils/parse_utils.h"
+#include "../BVH-cuda-inl.h"
+#include "../utils/parse_utils.h"
 
 #define EPSILON 1e-7
 #define NUM_TASKS 8192
