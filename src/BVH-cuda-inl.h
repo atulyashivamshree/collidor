@@ -45,7 +45,7 @@ struct DebugVar {
   Task tsk1;
   Task tsk2;
 };
-struct DistanceResult {
+struct DistanceResultGPU {
   float dist;
   int stop;
   int num_iter;
@@ -204,7 +204,7 @@ __global__ void countTasks(const Task* arr, const int start, const int num,
 // REQUIRES : Two bounding volume heirarchy bvhA, bvhB
 //            Config for the computation
 //            Queue of leaf elements
-//            DistanceResult to update results
+//            DistanceResultGPU to update results
 //            num : the number of leaf tasks that have been updated
 // MODIFIES : leaf queue
 //            Distance result
@@ -215,7 +215,7 @@ __global__ void countTasks(const Task* arr, const int start, const int num,
 // TODO(atulya) : parallelize this over multiple threads. update (remove it)
 __global__ void reduceLeafTasks(const BVH* bvhA, const BVH* bvhB,
                                 const Config* cfg, Queue* l_q,
-                                DistanceResult* res, const int num) {
+                                DistanceResultGPU* res, const int num) {
   if (threadIdx.y == 0 && blockIdx.y == 0) {
     float d_min = res->dist;
 
@@ -260,7 +260,7 @@ __device__ __inline__ void getNewTasks(const BV* bvA, const BV* bvB,
 //            if the new task is leaf adds it to the leaf_tasks
 // TODO(atulya) ADV write for it to handle multiple blocks
 __global__ void addDFSTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
-                            DistanceResult* res) {
+                            DistanceResultGPU* res) {
   __shared__ Task taskSetA[MAX_DFS_SET * 2];
   __shared__ Task taskSetA_red[MAX_DFS_SET * 2];
   __shared__ Task taskSetLeaf[MAX_DFS_SET * 2];
@@ -365,7 +365,7 @@ __global__ void addDFSTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
 //            set of BV tasks or to a set of leaf tasks
 __global__ void addBFSTasksToTemp(const BVH* bvhA, const BVH* bvhB,
                                   const Config* cfg, const Queue* bv_q,
-                                  const Queue* l_q, DistanceResult* res,
+                                  const Queue* l_q, DistanceResultGPU* res,
                                   const int num) {
   int tx = threadIdx.x;
   int ty = threadIdx.y;
@@ -491,7 +491,7 @@ __global__ void addBFSTasksToTemp(const BVH* bvhA, const BVH* bvhB,
 // EFFECTS  : adds tasks from the temp set to the queue
 // ASSUMES only one block is present
 __global__ void addBFSTasksToQueue(Queue* bv_q, Queue* l_q, int num_rows,
-                                   DistanceResult* res) {
+                                   DistanceResultGPU* res) {
   int ty = threadIdx.y;
 
   __shared__ int bvq_last;
@@ -561,7 +561,7 @@ __global__ void fillDFSSet(Queue* bv_q, int count) {
 //            remove from dfs_extra
 // EFFECTS  : transfers tasks from dfs_extra to BV queue
 __global__ void transferDFSandBFS(Queue* bv_q, int dfs_extra_size,
-                                  DistanceResult* res) {
+                                  DistanceResultGPU* res) {
   int tid = threadIdx.y;
   int last = bv_q->last;
 
@@ -585,7 +585,7 @@ __global__ void transferDFSandBFSLeafs(Queue* l_q, int set_size) {
 // REQUIRES : Two bounding volume heirarchy bvhA, bvhB
 //            Config for the computation
 //            Queue of BV elements
-//            DistanceResult to update results
+//            DistanceResultGPU to update results
 //            num : the number of leaf tasks that have been updated
 // MODIFIES : BV queue
 //            Stopping conditions inside DistResult
@@ -596,7 +596,7 @@ __global__ void transferDFSandBFSLeafs(Queue* l_q, int set_size) {
 //            Stopping conditions inside DistResult
 // TODO(atulya) : parallelize this over multiple threads
 __device__ void addBVTasks(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
-                           Queue* bv_q, Queue* l_q, DistanceResult* res,
+                           Queue* bv_q, Queue* l_q, DistanceResultGPU* res,
                            int num_bfs_tasks) {
   float d_min = res->dist;
   dim3 dimBlockTasks(1, BLOCKSIZE_TASKS_ADDER);
@@ -779,10 +779,10 @@ __device__ void initializeGlobals(Queue* bv_queue, Queue* l_queue) {
 
 __global__ void manager(const BVH* bvhA, const BVH* bvhB, const Config* cfg,
                         Queue* bv_queue, Queue* l_queue, DebugVar* dbg_var,
-                        DistanceResult* result) {
+                        DistanceResultGPU* result) {
   initializeGlobals(bv_queue, l_queue);
 
-  DistanceResult res = *result;
+  DistanceResultGPU res = *result;
 
   dim3 dimBlockBV(1, BLOCKSIZE_BV);
   dim3 dimGridBV(1, 1);
@@ -889,7 +889,7 @@ __host__ void printDebugInfo(DebugVar* arr, int size) {
   }
 }
 
-void initializeResult(DistanceResult& result) {
+void initializeResult(DistanceResultGPU& result) {
   result.dist = 1.0e38;
   result.stop = 0;
   result.num_iter = 0;
@@ -918,7 +918,7 @@ __host__ void initializeDbg(DebugVar* arr, int size) {
   for (int i = 0; i < size; i++) arr[i] = DebugVar({0, 0, 0});
 }
 
-__host__ std::vector<DistanceResult> computeDistance(
+__host__ std::vector<DistanceResultGPU> computeDistance(
     const BVH* bvh1, const BVH* bvh2, Config cfg,
     const std::vector<Transform3f> transforms,
     const std::string debg_queue_filename, std::vector<float>& elap_time) {
@@ -956,11 +956,11 @@ __host__ std::vector<DistanceResult> computeDistance(
   cudaMalloc(&d_cfg, sizeof(Config));
 
   // CREATE THE OUTPUT VARIABLE
-  std::vector<DistanceResult> results;
-  DistanceResult h_res;
+  std::vector<DistanceResultGPU> results;
+  DistanceResultGPU h_res;
   initializeResult(h_res);
-  DistanceResult* d_res;
-  cudaMalloc(&d_res, sizeof(DistanceResult));
+  DistanceResultGPU* d_res;
+  cudaMalloc(&d_res, sizeof(DistanceResultGPU));
 
   // CREATE THE DEBUGGING VARIABLE
   DebugVar* h_dbg = new DebugVar[cfg.max_iter];
@@ -999,7 +999,8 @@ __host__ std::vector<DistanceResult> computeDistance(
                cudaMemcpyHostToDevice);
 
     // COPY OVER OUTPUT VARS
-    cudaMemcpy(d_res, &h_res, sizeof(DistanceResult), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_res, &h_res, sizeof(DistanceResultGPU),
+               cudaMemcpyHostToDevice);
 
     // COPY OVER CFG
     cudaMemcpy(d_cfg, &cfg, sizeof(Config), cudaMemcpyHostToDevice);
@@ -1028,7 +1029,8 @@ __host__ std::vector<DistanceResult> computeDistance(
     cudaMemcpy(h_dbg, d_dbg, cfg.max_iter * sizeof(DebugVar),
                cudaMemcpyDeviceToHost);
     // COPY BACK RESULTS
-    cudaMemcpy(&h_res, d_res, sizeof(DistanceResult), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&h_res, d_res, sizeof(DistanceResultGPU),
+               cudaMemcpyDeviceToHost);
 
     t_copy2 = get_wall_time();
 

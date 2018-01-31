@@ -1,7 +1,5 @@
-file1_obj: ../CAD/minicooper.obj
-file2_obj: ../CAD/cessna.obj
-file1_bvh: ../CAD/minicooper.bvh
-file2_bvh: ../CAD/cessna.bvh
+file1: ../CAD/minicooper.obj
+file2: ../CAD/cessna.obj
 transforms: ../CAD/transforms_set2.csv
 outp_prefix: cooper_cessna
 gamma: 0.0001

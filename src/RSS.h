@@ -9,7 +9,6 @@
  */
 
 #include "Triangle.h"
-#include "vector_math.h"
 
 #ifndef SRC_RSS_H_
 #define SRC_RSS_H_

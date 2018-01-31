@@ -23,7 +23,7 @@
 #include "fcl/narrowphase/detail/primitive_shape_algorithm/triangle_distance.h"
 #include "fcl/narrowphase/detail/traversal/collision_node.h"
 #include "fcl/narrowphase/detail/traversal/distance/mesh_distance_traversal_node.h"
-#include "test_fcl_utility.h"
+#include "fcl_utility.h"
 
 using std::cout;
 using std::endl;
@@ -33,6 +33,8 @@ using fcl::RSSf;
 
 #include "SampleObjects.h"
 #include "parse_utils.h"
+
+#define EPSILON 1e-5
 
 // takes in a BVH of FCL and converts to BVH of this project
 void verifyDistances(string file1, string file2, string transforms_file,
@@ -55,7 +57,7 @@ int main(int argc, char* argv[]) {
   map<string, string> params;
   loadConfig(params, argv[1]);
 
-  verifyDistances(params["file1_obj"], params["file2_obj"],
+  verifyDistances(params["file1"], params["file2"],
                   params["transforms"], params["outp_prefix"]);
 }
 
@@ -138,7 +140,9 @@ void verifyDistances(string file1, string file2, string transforms_file,
 
       cout << "iA: " << iA << " iB " << iB << " dist: " << dist
            << ", expected: " << correct_dist << endl;
-      assert(approxEquals(correct_dist, dist, 1e-4));
+      assert(approxEquals(correct_dist, dist,
+                          fmax(EPSILON, EPSILON * correct_dist)) ||
+             dist > 1e36);
     }
 
     cout << "============ Triangles ============" << endl;
@@ -157,7 +161,8 @@ void verifyDistances(string file1, string file2, string transforms_file,
           p2[t2[tB][1]], p2[t2[tB][2]], tf, temp1, temp2);
       cout << "iA: " << iA << " iB " << iB << " dist: " << dist
            << ", expected: " << correct_dist << endl;
-      assert(approxEquals(correct_dist, dist, 1e-4));
+      assert(approxEquals(correct_dist, dist,
+                          fmax(EPSILON, EPSILON * correct_dist)));
     }
 
     cout << "Transform [" << i << "] : PASSED" << endl;

@@ -8,10 +8,20 @@
  */
 
 
-#include "./vector_math.h"
-
 #ifndef SRC_TRIANGLE_H_
 #define SRC_TRIANGLE_H_
+
+struct Vector3 {
+  float x;
+  float y;
+  float z;
+};
+
+struct Matrix3 {
+  Vector3 v1;
+  Vector3 v2;
+  Vector3 v3;
+};
 
 // holds a triangle in 3D space
 struct Triangle {

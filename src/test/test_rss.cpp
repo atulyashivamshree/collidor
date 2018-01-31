@@ -11,10 +11,10 @@
 #include "../utils/compile_CPP.h"
 
 #define DIST_TRIANGLES distTriangles
-#include "../Triangles_test.h"
+#include "Triangles_test.h"
 
 #define DIST_RSS rssDistance
-#include "../Rectangle_tests.h"
+#include "Rectangle_tests.h"
 
 using std::cout;
 using std::endl;

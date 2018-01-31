@@ -127,7 +127,7 @@ std::istream& operator>>(std::istream& is, BV& bv) {
   return is;
 }
 // saves the BVH object to a file
-void saveBVH(std::ostream& os, const BVH* bvh) {
+void printBVH(std::ostream& os, const BVH* bvh) {
   os << std::setprecision(7);
   os << "NUM_BV: " << bvh->num_bv << " NUM_TRI: " << bvh->num_tri << endl;
   for (int i = 0; i < bvh->num_bv; i++) os << bvh->bv_arr[i];

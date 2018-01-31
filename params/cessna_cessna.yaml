@@ -1,7 +1,5 @@
-file1_obj: ../CAD/cessna.obj
-file2_obj: ../CAD/cessna.obj
-file1_bvh: ../CAD/cessna.bvh
-file2_bvh: ../CAD/cessna.bvh
+file1: ../CAD/cessna.obj
+file2: ../CAD/cessna.obj
 transforms: ../CAD/transforms_set2.csv
 outp_prefix: cessna_cessna
 gamma: 0.0001

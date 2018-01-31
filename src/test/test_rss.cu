@@ -25,21 +25,20 @@ using std::vector;
 #include "../RSS.h"
 #include "../BVH.h"
 
-__host__ float distTrianglesGPU(const Triangle *, const Triangle *, 
-                  const float R[3][3], const float t[3],
-                  DistTriangleVars* vars);
+__host__ float distTrianglesGPU(const Triangle *, const Triangle *,
+                                const float R[3][3], const float t[3],
+                                DistTriangleVars *vars);
 
-__host__ float distRSSGPU(const float R[3][3], const float t[3],
-                            const RSS* r1, const RSS* r2,
-                                DistRSSVars* vars);
+__host__ float distRSSGPU(const float R[3][3], const float t[3], const RSS *r1,
+                          const RSS *r2, DistRSSVars *vars);
 
 #define DIST_TRIANGLES distTrianglesGPU
 // use the test cases on the GPU triangles function
 #define DIST_RSS distRSSGPU
 
-#include "../Rectangle_tests.h"
 #include "../Triangle-cuda-inl.h"
 #include "../RSS-cuda-inl.h"
+#include "Rectangle_tests.h"
 
 const int size_rss = sizeof(RSS);
 
@@ -70,26 +69,22 @@ __host__ int main(int argc, char *argv[]) {
   testMultipleRandom();
 }
 
-__host__ float distTrianglesGPU(const Triangle *, const Triangle *, 
-                  const float R[3][3], const float t[3],
-                  DistTriangleVars* vars)
-{
+__host__ float distTrianglesGPU(const Triangle *, const Triangle *,
+                                const float R[3][3], const float t[3],
+                                DistTriangleVars *vars) {
   return 0;
 }
 
 // use this function to verify working by running it against the test cases
-__host__ float distRSSGPU(const float R[3][3], const float t[3],
-                            const RSS* r1, const RSS* r2,
-                                DistRSSVars* vars) {
+__host__ float distRSSGPU(const float R[3][3], const float t[3], const RSS *r1,
+                          const RSS *r2, DistRSSVars *vars) {
   RSS *d_r1, *d_r2;
   Config *d_cfg;
   Config h_cfg;
 
-  for(int i = 0; i < 3; i++)
-  {
+  for (int i = 0; i < 3; i++) {
     h_cfg.t[i] = t[i];
-    for(int j = 0; j < 3; j++)
-      h_cfg.R[i][j] = R[i][j];
+    for (int j = 0; j < 3; j++) h_cfg.R[i][j] = R[i][j];
   }
 
   cudaMalloc(&d_cfg, sizeof(Config));
@@ -128,11 +123,9 @@ __host__ void testSingleTiming() {
   Config *d_cfg;
   Config h_cfg;
 
-  for(int i = 0; i < 3; i++)
-  {
+  for (int i = 0; i < 3; i++) {
     h_cfg.t[i] = t0_[i];
-    for(int j = 0; j < 3; j++)
-      h_cfg.R[i][j] = matI_[i][j];
+    for (int j = 0; j < 3; j++) h_cfg.R[i][j] = matI_[i][j];
   }
 
   cudaMalloc(&d_cfg, sizeof(Config));
@@ -187,7 +180,7 @@ void testMultipleRandom() {
   }
 
   cout << "Initializing the RSS ... ";
-  for (int i = 0; i < NUM_CHECK ; i++) {
+  for (int i = 0; i < NUM_CHECK; i++) {
     h_r1[i] = getRandomRSS();
     h_r2[i] = getRandomRSS();
   }
@@ -203,11 +196,9 @@ void testMultipleRandom() {
   Config *d_cfg;
   Config h_cfg;
 
-  for(int i = 0; i < 3; i++)
-  {
+  for (int i = 0; i < 3; i++) {
     h_cfg.t[i] = t1_[i];
-    for(int j = 0; j < 3; j++)
-      h_cfg.R[i][j] = matR1_[i][j];
+    for (int j = 0; j < 3; j++) h_cfg.R[i][j] = matR1_[i][j];
   }
 
   cudaMalloc(&d_cfg, sizeof(Config));
@@ -245,13 +236,15 @@ void testMultipleRandom() {
   for (int i = 0; i < NUM_CHECK; i++) {
     float actual_res = distRectangles_fcl(h_cfg.R, h_cfg.t, h_r1[i], h_r2[i]);
 
-    if (approx_equal(h_res[i].dist, actual_res)) 
+    if (approx_equal(h_res[i].dist, actual_res))
       count_correct++;
     else
-      cout << i << "] DIFF actual: " << actual_res << ", obtained: " << h_res[i].dist<<endl;
+      cout << i << "] DIFF actual: " << actual_res
+           << ", obtained: " << h_res[i].dist << endl;
   }
 
-  cout << "total time with copying took " << (get_wall_time() - t_cuda_end) * 1000 << "ms" << endl;
+  cout << "total time with copying took "
+       << (get_wall_time() - t_cuda_end) * 1000 << "ms" << endl;
 
   cout << count_correct << "/" << NUM_CHECK << " are correct" << endl;
   cout << "Wall time multiple random(" << NUM_CHECK

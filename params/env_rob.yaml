@@ -1,7 +1,5 @@
-file1_obj: ../CAD/env.obj
-file2_obj: ../CAD/rob.obj
-file1_bvh: ../CAD/env.bvh
-file2_bvh: ../CAD/rob.bvh
+file1: ../CAD/env.obj
+file2: ../CAD/rob.obj
 transforms: ../CAD/transforms_set3.csv
 outp_prefix: env_rob
 gamma: 0.0001

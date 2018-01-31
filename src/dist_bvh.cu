@@ -18,15 +18,15 @@
 
 #include "BVH-cuda-inl.h"
 #include "utils/parse_utils.h"
+#include "utils/fcl_utility.h"
 
 using std::cout;
 using std::endl;
 using std::string;
 using std::vector;
 
-__host__ void loadBVHData(BVH& bvh, const string filename);
 __host__ void help_message();
-__host__ void printResult(std::ostream& os, const vector<DistanceResult> res,
+__host__ void printResult(std::ostream& os, const vector<DistanceResultGPU> res,
                           const vector<float> elap_time);
 
 __host__ int main(int argc, char* argv[]) {
@@ -52,8 +52,8 @@ __host__ int main(int argc, char* argv[]) {
 
   // Load the two BVH in consideration
   BVH bvhA, bvhB;
-  loadBVHData(bvhA, params["file1_bvh"]);
-  loadBVHData(bvhB, params["file2_bvh"]);
+  loadOBJToBVH(params["file1"], &bvhA);
+  loadOBJToBVH(params["file2"], &bvhB);
 
   // Load the transformations
   vector<Transform3f> transforms;
@@ -61,7 +61,7 @@ __host__ int main(int argc, char* argv[]) {
 
   // Compute distances and store the result
   vector<float> elap_time;
-  vector<DistanceResult> results = computeDistance(
+  vector<DistanceResultGPU> results = computeDistance(
       &bvhA, &bvhB, def_cfg, transforms, params["outp_prefix"], elap_time);
 
   // Store the entire result in an output file
@@ -95,20 +95,9 @@ __host__ void help_message() {
 }
 
 __host__ void printResult(std::ostream& os,
-                          const vector<DistanceResult> results,
+                          const vector<DistanceResultGPU> results,
                           const vector<float> elap_time) {
   os << std::setprecision(7);
   for (int i = 0; i < results.size(); i++)
     os << "[" << i << "] " << results[i].dist << " " << elap_time[i] << endl;
-}
-
-HOST_PREFIX void loadBVHData(BVH& bvh, const string filename) {
-  std::ifstream fin;
-  fin.open(filename.c_str());
-  if (!fin.is_open()) {
-    cout << "BVH: " << filename << " could not be opened" << endl;
-    exit(EXIT_FAILURE);
-  }
-
-  loadBVH(fin, &bvh);
 }

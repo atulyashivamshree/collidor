@@ -1,7 +1,5 @@
-file1_obj: _
-file2_obj: ../CAD/block.obj
-file1_bvh: ../CAD/sample1.bvh
-file2_bvh: ../CAD/block.bvh
+file1: ../CAD/sample1.obj
+file2: ../CAD/block.obj
 transforms: ../CAD/transforms_set0.csv
 outp_prefix: block_s1
 gamma: 0.0001

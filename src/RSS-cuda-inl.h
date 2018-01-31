@@ -31,11 +31,8 @@ __device__ void computeDistance(const RSS* r1, const RSS* r2,
   res->dist = dist;
 }
 
-
 __global__ void computeDistanceSingle(const RSS* r1, const RSS* r2,
-                                const Config* cfg,
-                                RSSResult* res)
-{
+                                      const Config* cfg, RSSResult* res) {
   float loc_R[3][3];
   float loc_t[3];
 
@@ -46,9 +43,8 @@ __global__ void computeDistanceSingle(const RSS* r1, const RSS* r2,
 }
 
 __global__ void computeDistanceArray(const RSS* arr_r1, const RSS* arr_r2,
-                                const Config* cfg,
-                                RSSResult* arr_res, int n) {
-
+                                     const Config* cfg, RSSResult* arr_res,
+                                     int n) {
   int g_j = blockIdx.y * blockDim.y + threadIdx.y;
 
   float loc_R[3][3];

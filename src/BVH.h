@@ -84,7 +84,7 @@ void deleteBVH(BVH* bv);
 void computeDistance(const BVH* bvh1, const BVH* bvh2);
 
 // saves the BVH object to a file
-void saveBVH(std::ostream& os, const BVH* bvh);
+void printBVH(std::ostream& os, const BVH* bvh);
 
 // loads the BVH from a file
 void loadBVH(std::istream& is, BVH* bvh);
