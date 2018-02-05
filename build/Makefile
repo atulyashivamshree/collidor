@@ -39,7 +39,6 @@ test_bvh.exe: $(SRC_BVH_TEST)
 	$(CUDA_CXX) $(CUDA_CFLAGS) $(INCLUDE_DIRS) $(SRC_BVH_TEST) -o test_bvh.exe
 
 test_rss_gpu.exe: $(SRC_RSS_TEST)
-	echo $(FCL_PATH)
 	$(CUDA_CXX) $(CUDA_CFLAGS) $(INCLUDE_DIRS) $(SRC_RSS_TEST) -o test_rss_gpu.exe
 
 test_rss_cpu.exe: $(SRC_RSS_TEST_CPU)
