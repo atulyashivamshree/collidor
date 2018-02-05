@@ -1,6 +1,6 @@
 file1: ../CAD/cessna.obj
 file2: ../CAD/cessna.obj
-transforms: ../CAD/transforms_set2.csv
+transforms: ../CAD/transforms_set0.csv
 outp_prefix: cessna_cessna
 gamma: 0.0001
 max_iter: 150

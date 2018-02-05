@@ -1,23 +1,68 @@
-# Collidor
-Implements collision check on two objects
+# Collidor - Proximty distance query using GPUs
+Collidor implements the proximity distance query between two objects using a GPU. 
 
-## File Description
-#### CUDA Executables
-These are the executables that would do the main computation on CUDA. Look up the Makefile inside **cuda_build** to get an idea of what they are doing
+## Installation
+#### Requirements
+* libccd
+* libeigen3-dev
+* FCL [https://github.com/flexible-collision-library/fcl](https://github.com/flexible-collision-library/fcl)
 
-1. **dist_bvh.exe** : Performs the main distance computation and prints out the results. This is independent of the FCL library and can run on any system.
-` ./dist_bvh.exe FILE1.bvh FILE2.bvh OUTPUT_PREFIX`
+The install script can be used to install the dependencies and FCL directly
+```
+./install.sh
+```
 
-2. **test_triangles.exe** : Performs some basic tests on triangles and runs the code on a large number of triangles to verifiy accuracy. This might need the FCL library to be installed. It would also be useful for running the performance evaluation on a large number of triangles for testing. 
-3. **test_rss.exe** : Similar to triangles test but in this case runs the test on RSS. Again this would also need the FCL library
+#### Compilation
+To compile first set the location of the FCL in the setup.bash file and source it. 
+```
+export FCL_PATH=/home/atulya/Documents/fcl
+```
+**Note:** The above needs to be done for every new terminal instance whether for compiling or running the program.
+ Then run makefile inside the build folder.
 
-TODO : perform O1 or O2 optimization
+```
+cd collidor
+cd build
+gedit setup.bash
+source setup.bash
+make
+```
 
-#### Non-CUDA executables
-These are helper files meant to perform conversions on the different file formats or run tests. These would require the FCL library as a dependency. Use the CMake file inside **src** to generate and run these executables.
+## Running
+To run the code 
+1. Download the CAD model of objects in .obj format
+2. Either create a new config file or use one of the existing files in the params folder for example **cessna_cessna.yaml**. Edit the following variables
+```
+file1: ../CAD/cessna.obj
+file2: ../CAD/cessna.obj
+transforms: ../CAD/transforms_set2.csv
+outp_prefix: cooper_cessna
+```
+Replace *file1* and *file2* with the.obj files to be used for comparision. The *transforms* variable provides a set of relative transforms in [X,Y,Z,roll,pitch,yaw] format. The file *transforms_set2.csv* contains 50 different 3D transformations. To run it on a smaller set use *transforms_set0.csv* Finally *outp_prefix* is the prefix for output files that are generated. Keep this the same as that of the config filename.
+3. Source the environment variables for every new terminal instance
+```
+source setup.bash
+```
+This would export the shared libary path of FCL
+4. Finally run the query using :
+```
+cd build
+./dist_bvh.exe ../params/cessna_cessna.yaml
+```
 
-1.  **save_to_bvh** : Converts the obj file to a BVH file which is read as an input by the cuda executable.
-2.  **compute_dist_bvh** : TODO this is meant to take in two random files as an input and compute the distance in between them over different value of the transformation matrix
-3. **verify_dist** : Takes in the two original .obj files and the .outp.csv files as input. It then verifies that the .outp.csv file has correctly measured the distance between the primitive triangles and RSS
-4.  **load_files**, **test_fcl_utility** :  sample files to verify the working of the FCL library
-5.  **test_rss**, **test_vector** : tests the working of the RSS, triangles and the standard vector library
+## Testing 
+The program runs a number of test cases to verify the working:
+
+* **Distance test** : This test takes in  a config file and computes the distance between two objects for multiple transformations as specified in the transforms file. It verifies if the computed distance from GPU is the same as that obtained from the FCL library and also shows the timing comparisions. Make sure you are working in a terminal where environment variables have been update (Step 3 of Running).
+```
+make  test_dist
+``` 
+If you wish to run tests on another config file you just need to provide in the name of the config file as a parameter. For example if the config file name is cessna_cessna.yaml just run
+```
+make  test_config=cessna_cessna test_dist
+``` 
+
+* **Unit tests** : Unit tests verify the working of the functions that are used inside the gpu algorithm. To run simply type in 
+```
+make unit_tests
+```

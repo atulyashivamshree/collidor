@@ -37,7 +37,7 @@ using fcl::Transform3;
 #include "SampleObjects.h"
 #include "parse_utils.h"
 
-#define EPSILON 1e-5
+#define EPSILON 2e-5
 
 template <typename S>
 void test_mesh_distance(string file1, string file2,
