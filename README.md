@@ -1,5 +1,5 @@
 # Collidor - Proximty distance query using GPUs
-Collidor implements the proximity distance query between two objects using a GPU. 
+Collidor implements the proximity distance query between two objects. The tow objects need to be present in the .obj format and you need to specify a relative transformation in between the objects![min_dist](min_dist.png)
 
 ## Installation
 #### Requirements
